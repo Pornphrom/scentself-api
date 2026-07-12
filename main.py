@@ -4,19 +4,38 @@
 # รันด้วย: uvicorn main:app --reload
 # Docs:    http://localhost:8000/docs
 
+import csv
+import json
 import os
 import uuid
 from typing import List, Optional
 from datetime import datetime
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from scentself import run_pipeline, FRAGRANCES, FAMILY_ORDER
 
 load_dotenv()
+
+# ── Registration storage (CSV) ──────────────────────────────────────────────
+
+CSV_PATH = os.path.join(os.path.dirname(__file__), "registrations.csv")
+CSV_FIELDS = [
+    "id", "timestamp", "for_whom", "age", "lifestyle", "budget",
+    "occasion", "mood", "scent_family", "outfit_description", "pre_confidence",
+]
+
+
+def _append_registration(row: dict):
+    file_exists = os.path.isfile(CSV_PATH)
+    with open(CSV_PATH, "a", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(row)
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
@@ -75,6 +94,12 @@ class RecommendResponse(BaseModel):
     advisor_note: str
 
 
+class RegisterResponse(BaseModel):
+    registration_id: str
+    timestamp: str
+    message: str
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/", tags=["Info"])
@@ -85,7 +110,8 @@ def root():
         "project": "NIDA MADT IS — AI-Powered Fragrance Advisor",
         "docs": "/docs",
         "endpoints": {
-            "POST /recommend": "รับ user profile → คืน Top 3 recommendation",
+            "POST /register": "บันทึกข้อมูลผู้ใช้งานลงไฟล์ CSV",
+            "GET  /recommend": "รับ user profile (query params) → คืน Top 3 recommendation (ไม่บันทึกข้อมูล)",
             "GET  /fragrances": "ดู fragrance database ทั้งหมด (กรองด้วย ?family=Floral)",
             "GET  /health": "health check",
         },
@@ -120,7 +146,7 @@ def list_fragrances(family: Optional[str] = None, max_price: Optional[int] = Non
 
 @app.get("/families", tags=["Database"])
 def list_families():
-    """ดูรายการ scent families และจำนวนน้ำหอมในแต่ละ family"""
+    """ดูหมวดหมู่กลิ่นน้ำหอมทั้งหมดในระบบ"""
     from collections import Counter
     counts = Counter(f["family"] for f in FRAGRANCES)
     return {
@@ -130,10 +156,44 @@ def list_families():
     }
 
 
-@app.post("/recommend", response_model=RecommendResponse, tags=["Advisor"])
-async def recommend(profile: UserProfile):
+@app.post("/register", response_model=RegisterResponse, tags=["Advisor"])
+def register(profile: UserProfile):
     """
-    **Main endpoint** — รับ user profile → รัน full pipeline → คืน Top 3
+    **บันทึกข้อมูลผู้ใช้งาน** — เก็บ user profile ลงไฟล์ `registrations.csv`
+
+    ต่างจาก `/recommend` ตรงที่ endpoint นี้จะบันทึกข้อมูลทุกครั้งที่เรียก
+    ใช้สำหรับเก็บข้อมูลตอนเริ่มต้นใช้งาน (Step 1–2 ของ flow)
+    """
+    registration_id = str(uuid.uuid4())[:8]
+    timestamp = datetime.utcnow().isoformat()
+
+    _append_registration({
+        "id": registration_id,
+        "timestamp": timestamp,
+        "for_whom": profile.for_whom,
+        "age": profile.age,
+        "lifestyle": json.dumps(profile.lifestyle, ensure_ascii=False),
+        "budget": profile.budget,
+        "occasion": profile.occasion,
+        "mood": json.dumps(profile.mood, ensure_ascii=False),
+        "scent_family": json.dumps(profile.scent_family, ensure_ascii=False),
+        "outfit_description": profile.outfit_description,
+        "pre_confidence": profile.pre_confidence,
+    })
+
+    return {
+        "registration_id": registration_id,
+        "timestamp": timestamp,
+        "message": "บันทึกข้อมูลผู้ใช้งานสำเร็จ",
+    }
+
+
+@app.get("/recommend", response_model=RecommendResponse, tags=["Advisor"])
+async def recommend(profile: UserProfile = Depends()):
+    """
+    **Main endpoint** — รับ user profile (query params) → รัน full pipeline → คืน Top 3
+
+    ไม่มีการบันทึกข้อมูลลงตาราง (อ่าน/คำนวณอย่างเดียว) — ถ้าต้องการบันทึกข้อมูลผู้ใช้ ให้เรียก `/register` แยกต่างหาก
 
     Pipeline (Python):
     1. `build_scent_dna()`     — แปลง selections → DNA weights
