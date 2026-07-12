@@ -1,0 +1,177 @@
+# main.py
+# ScentSelf FastAPI — NIDA MADT IS Project
+#
+# รันด้วย: uvicorn main:app --reload
+# Docs:    http://localhost:8000/docs
+
+import os
+import uuid
+from typing import List, Optional
+from datetime import datetime
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from scentself import run_pipeline, FRAGRANCES, FAMILY_ORDER
+
+load_dotenv()
+
+# ── App ───────────────────────────────────────────────────────────────────────
+
+app = FastAPI(
+    title="ScentSelf API",
+    description="AI-Powered Fragrance Advisor — NIDA MADT IS · Palaloy",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],       # เปิด CORS ให้ HTML mockup เรียกได้
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Request / Response Models ─────────────────────────────────────────────────
+
+class UserProfile(BaseModel):
+    for_whom: str = Field(default="ใช้เอง", description="ใช้เอง | เป็นของขวัญ")
+    age: Optional[str] = Field(default="25–34")
+    lifestyle: List[str] = Field(default=[], description="เช่น ['ทำงานออฟฟิศ', 'แต่งตัวเรียบง่าย']")
+    budget: int = Field(default=4000, ge=500, le=20000, description="งบประมาณ (บาท)")
+    occasion: str = Field(default="ทำงาน", description="ทำงาน | เดต | ทุกวัน | ออกงาน | ท่องเที่ยว")
+    mood: List[str] = Field(default=[], description="เช่น ['สะอาด', 'เรียบง่าย']")
+    scent_family: List[str] = Field(default=[], description="Fresh | Floral | Woody | Aquatic | Amber | Gourmand | Not sure")
+    outfit_description: str = Field(default="", description="อธิบาย outfit หรือบริบทเพิ่มเติม")
+    pre_confidence: int = Field(default=2, ge=1, le=5, description="ความมั่นใจก่อนใช้ระบบ (1–5)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "for_whom": "ใช้เอง",
+                "age": "25–34",
+                "lifestyle": ["ทำงานออฟฟิศ", "แต่งตัวเรียบง่าย"],
+                "budget": 4000,
+                "occasion": "ทำงาน",
+                "mood": ["สะอาด", "เรียบง่าย"],
+                "scent_family": ["Fresh", "Floral"],
+                "outfit_description": "เสื้อเชิ้ตสีขาว กางเกงทรงเรียบ ประชุมสำคัญ",
+                "pre_confidence": 2,
+            }
+        }
+
+
+class RecommendResponse(BaseModel):
+    session_id: str
+    timestamp: str
+    profile_summary: dict
+    scent_dna: dict
+    candidates_evaluated: int
+    top3: list
+    advisor_note: str
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@app.get("/", tags=["Info"])
+def root():
+    return {
+        "service": "ScentSelf API",
+        "version": "1.0.0",
+        "project": "NIDA MADT IS — AI-Powered Fragrance Advisor",
+        "docs": "/docs",
+        "endpoints": {
+            "POST /recommend": "รับ user profile → คืน Top 3 recommendation",
+            "GET  /fragrances": "ดู fragrance database ทั้งหมด (กรองด้วย ?family=Floral)",
+            "GET  /health": "health check",
+        },
+    }
+
+
+@app.get("/health", tags=["Info"])
+def health():
+    api_key_set = bool(os.environ.get("GEMINI_API_KEY"))
+    return {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+        "gemini_api_key": "set" if api_key_set else "NOT SET — ต้องตั้งค่าก่อน",
+        "fragrances_loaded": len(FRAGRANCES),
+    }
+
+
+@app.get("/fragrances", tags=["Database"])
+def list_fragrances(family: Optional[str] = None, max_price: Optional[int] = None):
+    """
+    ดู fragrance database
+    - ?family=Floral  → กรองตาม family
+    - ?max_price=3000 → กรองตามราคา
+    """
+    result = FRAGRANCES
+    if family:
+        result = [f for f in result if f["family"].lower() == family.lower()]
+    if max_price:
+        result = [f for f in result if f["price"] <= max_price]
+    return {"count": len(result), "fragrances": result}
+
+
+@app.get("/families", tags=["Database"])
+def list_families():
+    """ดูรายการ scent families และจำนวนน้ำหอมในแต่ละ family"""
+    from collections import Counter
+    counts = Counter(f["family"] for f in FRAGRANCES)
+    return {
+        "families": FAMILY_ORDER,
+        "counts": {f: counts.get(f, 0) for f in FAMILY_ORDER},
+        "total": len(FRAGRANCES),
+    }
+
+
+@app.post("/recommend", response_model=RecommendResponse, tags=["Advisor"])
+async def recommend(profile: UserProfile):
+    """
+    **Main endpoint** — รับ user profile → รัน full pipeline → คืน Top 3
+
+    Pipeline (Python):
+    1. `build_scent_dna()`     — แปลง selections → DNA weights
+    2. `score_fragrances()`    — cosine similarity ranking
+    3. `explain_with_gemini()` — Gemini API → Thai explanation
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="GEMINI_API_KEY ยังไม่ได้ตั้งค่า — ดู .env.example"
+        )
+
+    try:
+        result = run_pipeline(
+            for_whom=profile.for_whom,
+            lifestyle=profile.lifestyle,
+            budget=profile.budget,
+            occasion=profile.occasion,
+            mood=profile.mood,
+            scent_family=profile.scent_family,
+            outfit_description=profile.outfit_description,
+            api_key=api_key,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
+
+    return {
+        "session_id": str(uuid.uuid4())[:8],
+        "timestamp": datetime.utcnow().isoformat(),
+        "profile_summary": {
+            "for_whom": profile.for_whom,
+            "occasion": profile.occasion,
+            "budget": profile.budget,
+            "mood": profile.mood,
+            "pre_confidence": profile.pre_confidence,
+        },
+        **result,
+    }
