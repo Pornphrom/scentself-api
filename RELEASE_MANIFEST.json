@@ -4,7 +4,7 @@
   "versions": {
     "catalog": "catalog_v3.2_thai_notes_20261103",
     "engine": "v2.2",
-    "ui": "senna-chat-v3-consent-20261103",
+    "ui": "senna-chat-v3-scenario-en-20261103",
     "llm": "gemini-3.5-flash-lite",
     "llm_role": "extractive"
   },
@@ -19,7 +19,7 @@
     ".env.example": "073ceb6e269f5c7a9c64a21b6f01f6bbc14d334ed772c31c27bed16ceb1bfa01",
     "requirements.txt": "5c02b9eeeddfdd355dba5a99f1d843157134f776c41d9b75d70ae5197da1984c",
     "main_pilot.py": "ac8ef2836b68ced880cbdd237be4d54a04bb57380336707d905ee87d2a1ae3fd",
-    "main_v3.py": "8bf63a372aaacae2ab0b0ac666bd1de252ae78d973a9db574c5f1397a79a3c4a",
+    "main_v3.py": "0e53b58fcfbd8eec4e690eae057f834e7c2f5c781ada6ac2058473345f9ce228",
     "study_v3_adapter.py": "396ae6bf29fa2c1bb9437e8182c7bbf7ff99ecabeb0e542eefc555f47f13cd25",
     "study/__init__.py": "fafe36c4e2460906093e32938d1574d1631fb410ca8e7e1ff7e94042ee481952",
     "study/config.py": "8e467f92aeaee8fa5b7c73025df7a9499425a4a427859ea7875a3d10d85c6bf9",
@@ -37,7 +37,7 @@
     "engine_v2/catalog_v3_2.json": "4219db72512b5a258d66ca46e7b02489dfcd546b214fad878636c0d80ecafefb",
     "static/study_v3/index.html": "1b9e8357f199f4e9f8c75b4b802663e3289fc2223629e6d52d722afea55883ab",
     "static/study_v3/senna.css": "3b8a7133f6d4bf2a8b6ef7722d7ca587014e2624b305ed0df5889ebe3f4f5caf",
-    "static/study_v3/senna.js": "fc598693b88da61583c05e94f2d6600460e5b508d816ac1a3d1e469c8c20221f",
+    "static/study_v3/senna.js": "93238dc7fb93d63bea8ecfce9d068b10c94c031c622bc62049118288e38072a0",
     "static/study_v3/images_v3.json": "82cb0621c24a14de864015fb4c14d2e160b216ddbdf633bb418a47e7ad5e5a8b",
     "main_pilot_free.py": "38118651ff8983bf7bd314200a244856581f6734abb74d895435e0f08a18e68f",
     "requirements-free.txt": "c827a51e5f94403b146cc45b2acebaa433b81284d8945a570a720b9c7b84c6fd",

@@ -42,8 +42,9 @@ async function run(fn) {
 
 // ---------- free-text understanding (browser only) ----------
 const KW = {
-  scenario: {A: ["งาน", "ทำงาน", "ออฟฟิศ", "เรียน", "ประชุม", "มหาลัย", "สัมภาษณ์"], B: ["พักผ่อน", "เที่ยว", "ชิล", "วันหยุด", "คาเฟ่", "เดินเล่น", "สบาย ๆ", "สบายๆ"],
-             C: ["งานเลี้ยง", "ปาร์ตี้", "ดินเนอร์", "เดท", "เดต", "กลางคืน", "ออกงาน", "แต่งงาน", "อีเวนต์"]},
+  scenario: {A: ["งาน", "ทำงาน", "ออฟฟิศ", "เรียน", "ประชุม", "มหาลัย", "สัมภาษณ์", "work", "office", "school", "study", "studying", "class", "meeting", "interview"],
+             B: ["พักผ่อน", "เที่ยว", "ชิล", "วันหยุด", "คาเฟ่", "เดินเล่น", "สบาย ๆ", "สบายๆ", "relax", "relaxing", "casual", "weekend", "holiday", "vacation", "cafe", "coffee", "walk", "walking", "chill", "chilling"],
+             C: ["งานเลี้ยง", "ปาร์ตี้", "ดินเนอร์", "เดท", "เดต", "กลางคืน", "ออกงาน", "แต่งงาน", "อีเวนต์", "party", "parties", "partying", "dinner", "date", "wedding", "night out", "nightlife", "event", "gala"]},
   families: {citrus: ["ส้ม", "มะนาว", "ซิตรัส", "สดชื่น", "เปรี้ยว"], aquatic: ["ทะเล", "น้ำ", "มหาสมุทร"], floral: ["ดอกไม้", "กุหลาบ", "มะลิ", "ฟลอรัล"],
              woody: ["ไม้", "วู้ด", "วูดดี้", "ซีดาร์", "แซนดัล"], green: ["ใบไม้", "ชาเขียว", "ใบชา", "หญ้า", "ธรรมชาติ", "เขียว"], gourmand: ["หวาน", "วานิลลา", "ขนม", "คาราเมล", "ช็อกโกแลต"],
              amber: ["อำพัน", "เรซิน", "กำยาน"], spicy: ["เครื่องเทศ", "อบเชย", "พริกไทย", "สไปซี่"], musk: ["สะอาด", "มัสก์", "แป้ง", "สบู่", "ผ้า"]},
@@ -51,7 +52,10 @@ const KW = {
 };
 function understand(text) {
   const t = text.toLowerCase().replace(/\s+/g, " "), out = {families: []};
-  const hit = (list, src = t) => list.some(w => src.includes(w));
+  // Match English aliases as words, so "date" never matches "update".
+  const hit = (list, src = t) => list.some(w => /^[a-z]/.test(w)
+    ? new RegExp(`(^|[^a-z0-9_])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9_])`).test(src)
+    : src.includes(w));
   for (const k of ["C", "B", "A"]) if (!out.scenario && hit(KW.scenario[k], k === "A" ? t.replace(/งานเลี้ยง|ออกงาน|งานแต่ง/g, "") : t)) out.scenario = k;
   const noPerfume = t.replace(/น้ำหอม/g, ""), noFlowerLeaf = noPerfume.replace(/ดอกไม้|ใบไม้|ไม้ดอก/g, "");
   out.not = [];

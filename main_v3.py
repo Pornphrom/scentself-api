@@ -16,7 +16,7 @@ from study.config import Settings
 from study.routes import make_router
 from study_v3_adapter import EngineAdapterV3
 
-UI_VERSION = "senna-chat-v3-consent-20261103"
+UI_VERSION = "senna-chat-v3-scenario-en-20261103"
 STATIC = Path(__file__).resolve().parent / "static" / "study_v3"
 
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
