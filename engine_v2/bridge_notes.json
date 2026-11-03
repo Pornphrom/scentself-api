@@ -1,0 +1,396 @@
+{
+"version": "bridge_notes (2026-10-31)",
+"rule": "note linked to both families: lift>=1.2 and q<0.05 (permutation, BH) on 1,776 Fragrantica perfumes",
+"pairs": [
+{
+"fam_a": "แนวน้ำ / ทะเล",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "sage",
+"strength": 1.799
+},
+{
+"fam_a": "แนวน้ำ / ทะเล",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "green apple",
+"strength": 1.635
+},
+{
+"fam_a": "แนวน้ำ / ทะเล",
+"fam_b": "อำพัน / เรซิน",
+"note": "ambergris",
+"strength": 1.506
+},
+{
+"fam_a": "เขียว / ใบไม้ / ดิน",
+"fam_b": "เครื่องเทศ",
+"note": "basil",
+"strength": 1.39
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "elemi",
+"strength": 1.224
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "petitgrain",
+"strength": 1.221
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "frankincense",
+"strength": 1.221
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "saffron",
+"strength": 1.159
+},
+{
+"fam_a": "หวานแนวขนม",
+"fam_b": "เครื่องเทศ",
+"note": "licorice",
+"strength": 1.125
+},
+{
+"fam_a": "เขียว / ใบไม้ / ดิน",
+"fam_b": "เครื่องเทศ",
+"note": "mint",
+"strength": 1.052
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "myrrh",
+"strength": 1.02
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "oud",
+"strength": 1.003
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "cypress",
+"strength": 0.954
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "olibanum",
+"strength": 0.924
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "cinnamon",
+"strength": 0.916
+},
+{
+"fam_a": "หวานแนวขนม",
+"fam_b": "มัสก์ / แนวสะอาด / แป้ง",
+"note": "heliotrope",
+"strength": 0.899
+},
+{
+"fam_a": "ดอกไม้",
+"fam_b": "หวานแนวขนม",
+"note": "litchi",
+"strength": 0.885
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เครื่องเทศ",
+"note": "basil",
+"strength": 0.867
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "basil",
+"strength": 0.867
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เครื่องเทศ",
+"note": "rosemary",
+"strength": 0.848
+},
+{
+"fam_a": "เขียว / ใบไม้ / ดิน",
+"fam_b": "เครื่องเทศ",
+"note": "sage",
+"strength": 0.839
+},
+{
+"fam_a": "แนวน้ำ / ทะเล",
+"fam_b": "เครื่องเทศ",
+"note": "sage",
+"strength": 0.839
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "juniper",
+"strength": 0.8
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "juniper berries",
+"strength": 0.8
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "หวานแนวขนม",
+"note": "tangerine",
+"strength": 0.793
+},
+{
+"fam_a": "ดอกไม้",
+"fam_b": "มัสก์ / แนวสะอาด / แป้ง",
+"note": "ambrette (musk mallow)",
+"strength": 0.78
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "แนวน้ำ / ทะเล",
+"note": "sea notes",
+"strength": 0.713
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "incense",
+"strength": 0.708
+},
+{
+"fam_a": "แนวน้ำ / ทะเล",
+"fam_b": "ดอกไม้",
+"note": "lotus",
+"strength": 0.685
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เครื่องเทศ",
+"note": "grapefruit",
+"strength": 0.662
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "labdanum",
+"strength": 0.615
+},
+{
+"fam_a": "ดอกไม้",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "lily-of-the-valley",
+"strength": 0.584
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "agarwood (oud)",
+"strength": 0.582
+},
+{
+"fam_a": "ไม้",
+"fam_b": "อำพัน / เรซิน",
+"note": "oud",
+"strength": 0.577
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "oud",
+"strength": 0.577
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "หวานแนวขนม",
+"note": "pineapple",
+"strength": 0.539
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เครื่องเทศ",
+"note": "ginger",
+"strength": 0.528
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เครื่องเทศ",
+"note": "mint",
+"strength": 0.495
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "mint",
+"strength": 0.495
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เครื่องเทศ",
+"note": "lavender",
+"strength": 0.482
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "leather",
+"strength": 0.481
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "oakmoss",
+"strength": 0.474
+},
+{
+"fam_a": "อำพัน / เรซิน",
+"fam_b": "เครื่องเทศ",
+"note": "benzoin",
+"strength": 0.467
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "olibanum",
+"strength": 0.448
+},
+{
+"fam_a": "ไม้",
+"fam_b": "อำพัน / เรซิน",
+"note": "olibanum",
+"strength": 0.448
+},
+{
+"fam_a": "ดอกไม้",
+"fam_b": "หวานแนวขนม",
+"note": "pear",
+"strength": 0.419
+},
+{
+"fam_a": "ไม้",
+"fam_b": "อำพัน / เรซิน",
+"note": "saffron",
+"strength": 0.418
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "saffron",
+"strength": 0.418
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "vetiver",
+"strength": 0.412
+},
+{
+"fam_a": "ไม้",
+"fam_b": "อำพัน / เรซิน",
+"note": "labdanum",
+"strength": 0.384
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "labdanum",
+"strength": 0.384
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "vetiver",
+"strength": 0.376
+},
+{
+"fam_a": "เขียว / ใบไม้ / ดิน",
+"fam_b": "เครื่องเทศ",
+"note": "vetiver",
+"strength": 0.376
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "ดอกไม้",
+"note": "orange blossom",
+"strength": 0.371
+},
+{
+"fam_a": "ดอกไม้",
+"fam_b": "มัสก์ / แนวสะอาด / แป้ง",
+"note": "peach",
+"strength": 0.343
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "lavender",
+"strength": 0.326
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "ไม้",
+"note": "lavender",
+"strength": 0.326
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "leather",
+"strength": 0.309
+},
+{
+"fam_a": "ไม้",
+"fam_b": "อำพัน / เรซิน",
+"note": "leather",
+"strength": 0.309
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เขียว / ใบไม้ / ดิน",
+"note": "vetiver",
+"strength": 0.279
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "เครื่องเทศ",
+"note": "vetiver",
+"strength": 0.279
+},
+{
+"fam_a": "ซิตรัส",
+"fam_b": "ไม้",
+"note": "vetiver",
+"strength": 0.279
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "cardamom",
+"strength": 0.265
+},
+{
+"fam_a": "ดอกไม้",
+"fam_b": "มัสก์ / แนวสะอาด / แป้ง",
+"note": "iris",
+"strength": 0.237
+},
+{
+"fam_a": "ไม้",
+"fam_b": "เครื่องเทศ",
+"note": "cedar",
+"strength": 0.236
+}
+]
+}

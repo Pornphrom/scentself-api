@@ -1,10 +1,35 @@
+# Candidate only. No paid resources, persistent disks or Render Postgres.
+# Requires an independently confirmed Neon Free project (no trial database).
 services:
   - type: web
-    name: scentself-api
+    name: scentself-senna-pilot-free
     runtime: python
+    region: singapore
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    autoDeployTrigger: "off"
+    buildCommand: pip install -r requirements-free.txt
+    startCommand: uvicorn main_pilot_free:create_app --factory --host 0.0.0.0 --port $PORT --workers 1 --limit-concurrency 20 --no-access-log
+    healthCheckPath: /v2/health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: SCENTSELF_DATA_DIR
+        value: /tmp/scentself-pilot-cache
+      - key: SCENTSELF_STUDY_MODE
+        value: pilot
+      - key: SCENTSELF_LLM_PROVIDER
+        value: gemini
+      - key: SCENTSELF_GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: SCENTSELF_LLM_DAILY_LIMIT
+        value: "50"
+      - key: SCENTSELF_CONSENT_VERSION
+        value: pilot-consent-20261103
+      - key: SCENTSELF_RETENTION_UNTIL
+        value: "2027-05-03"
+      - key: SCENTSELF_DATABASE_URL
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: SCENTSELF_ADMIN_TOKEN
+        generateValue: true

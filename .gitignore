@@ -11,3 +11,8 @@ venv/
 # Output
 result.json
 registrations.csv
+study_data/
+.pytest_cache/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal

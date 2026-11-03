@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#24564a">
+  <title>คุยกับ Senna</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/senna/assets/senna.css">
+  <script defer src="/senna/assets/senna.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-inner">
+      <div class="who">
+        <span class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v4.2a6 6 0 1 0 4 0V3"/><path d="M8.2 14.5h7.6"/></svg></span>
+        <span><strong>Senna</strong><small id="status">ที่ปรึกษาน้ำหอม</small></span>
+      </div>
+      <ol class="journey" id="journey" aria-label="ขั้นตอน">
+        <li data-step="talk">เล่าความต้องการ</li><li data-step="look">ดูตัวเลือก</li><li data-step="feedback">ความเห็น</li>
+      </ol>
+      <button class="menu" id="menu" type="button" aria-haspopup="true" aria-expanded="false" aria-label="ตัวเลือกเพิ่มเติม"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+      <div class="menu-pop" id="menu-pop" hidden>
+        <p id="mode-note"></p>
+        <button type="button" id="withdraw">ถอนตัวและลบคำตอบรอบนี้</button>
+      </div>
+    </div>
+  </header>
+  <main class="thread" id="thread" aria-live="polite"></main>
+  <footer class="composer" id="composer"></footer>
+</body>
+</html>
