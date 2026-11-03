@@ -151,6 +151,9 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .fact{font-size:12.5px;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-chip);padding:2px 9px}
 .fact.dot:before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px}
 .fact.warn{background:#fbefe0;border-color:#ecd2ad;color:#7b4f17}
+.fact.shared{background:#e7f0f6;border-color:#b9cfde;color:#31596b}
+.menu-pop a{display:block;color:var(--juniper);font-size:14px;padding:8px 0;text-decoration:none}
+.menu-pop a[hidden]{display:none}
 .why{margin:4px 0 0;padding:10px 12px;background:var(--juniper-soft);border-radius:12px;font-size:14px;line-height:1.6}
 .why ul{margin:6px 0 0;padding-left:18px}
 .why li+li{margin-top:3px}

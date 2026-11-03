@@ -13,6 +13,13 @@ from .schemas import BUDGET, CONFIDENCE, EXPERIENCE, FAMILIES, IMAGES, SCENARIOS
 from .store import StateConflict, Store
 
 
+def compare_sets(sets):
+    first, second = ([item["id"] for item in group["items"]] for group in sets)
+    shared = sorted(set(first) & set(second))
+    return {"shared_item_ids": shared, "overlap_count": len(shared),
+            "identical_items": set(first) == set(second), "identical_order": first == second}
+
+
 def make_router(settings, store=None, adapter=None, explainer=None):
     router = APIRouter(prefix="/v2", tags=["Pilot study"])
     if store is None:
@@ -55,6 +62,7 @@ def make_router(settings, store=None, adapter=None, explainer=None):
             result["preferences"] = data.get("preferences")
         if "cards" in data and session["state"] != "complete":
             result["sets"] = [{"slot": slot, "label": f"ชุดที่ {i + 1}", "items": [data["cards"][f"{method}{k}"] for k in range(3)]} for i, (slot, method) in enumerate(zip(["first", "second"], data["order_AB"]))]
+            result["comparison"] = compare_sets(result["sets"])
             result["families_from_popularity"] = data["engine_result"]["request"]["families_from_popularity"]
             result["selected_family_labels"] = data["engine_result"]["request"]["families"]
             result["viewed"] = data.get("viewed", {})
@@ -144,6 +152,7 @@ def make_router(settings, store=None, adapter=None, explainer=None):
         try:
             engine_result, cards = adapter.recommend(session["data"]["pre"], preferences)
             explanation_meta = explainer.explain(cards)
+            comparison = compare_sets([{"items": [cards[f"{method}{k}"] for k in range(3)]} for method in session["data"]["order_AB"]])
         except Exception:
             try:
                 move(sid, token, ["generating"], "pre_ready", {})
@@ -151,7 +160,7 @@ def make_router(settings, store=None, adapter=None, explainer=None):
                 pass
             raise HTTPException(503, "ยังเตรียมคำแนะนำไม่สำเร็จ กรุณาลองอีกครั้ง ข้อมูลก่อนใช้ยังอยู่") from None
         session = move(sid, token, ["generating"], "recommended", {"preferences": preferences, "engine_result": engine_result,
-                          "cards": cards, "explanation_meta": explanation_meta, "recommended_utc": datetime.now(timezone.utc).isoformat()})
+                          "cards": cards, "comparison": comparison, "explanation_meta": explanation_meta, "recommended_utc": datetime.now(timezone.utc).isoformat()})
         return public(session)
 
     @router.post("/study/sessions/{sid}/complete")

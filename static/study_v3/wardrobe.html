@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#24564a">
+  <title>เลือกจากขวดที่มี | Senna</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/senna/assets/senna.css">
+  <link rel="stylesheet" href="/senna/assets/wardrobe.css">
+  <script defer src="/senna/assets/wardrobe.js"></script>
+</head>
+<body class="wardrobe">
+  <header class="wardrobe-bar"><a href="/senna" aria-label="กลับไป Senna">Senna</a><span>เลือกจากขวดที่มี</span></header>
+  <main class="wardrobe-main">
+    <h1>วันนี้ใช้ขวดไหนดี</h1>
+    <p class="sub">โหมดส่วนตัว ไม่บันทึกเป็นคำตอบวิจัย</p>
+    <div id="load-error" class="wardrobe-error" role="alert" hidden></div>
+    <form id="owned-form" hidden>
+      <section class="owned-section">
+        <h2>ขวดที่มีอยู่ <span id="owned-count">0 / 10</span></h2>
+        <label class="lbl" for="owned-search">แบรนด์หรือชื่อน้ำหอม</label>
+        <div class="search"><input type="search" id="owned-search" autocomplete="off" maxlength="100" placeholder="เช่น CK One หรือ Chanel" aria-controls="owned-results" aria-expanded="false">
+          <div id="owned-results" class="results" aria-live="polite" hidden></div></div>
+        <p class="sub" id="search-status" role="status"></p>
+        <ul id="owned-list" class="owned-list"></ul>
+      </section>
+      <section class="owned-section">
+        <h2>โอกาสใช้งาน</h2>
+        <fieldset id="occasion" class="segmented"><legend class="sr-only">โอกาสใช้งาน</legend></fieldset>
+        <div class="preference-grid">
+          <fieldset><legend>แนวกลิ่นที่อยากได้ (ไม่เกิน 2)</legend><div id="owned-families" class="owned-families"></div></fieldset>
+          <fieldset><legend>ระดับการกระจายกลิ่น</legend>
+            <select id="owned-sillage" aria-label="ระดับการกระจายกลิ่น">
+              <option value="">ยังไม่กำหนด</option>
+              <option value="0">เบา · ต้องเข้ามาใกล้ถึงได้กลิ่น</option>
+              <option value="1">ปานกลาง · คนที่อยู่ใกล้ได้กลิ่น</option>
+              <option value="2">ชัด · คนรอบข้างรับรู้</option>
+            </select>
+          </fieldset>
+        </div>
+        <button class="btn" id="compare-owned" type="submit" disabled>ช่วยเลือกจากขวดเหล่านี้</button>
+        <p id="owned-error" class="wardrobe-error" role="alert" hidden></p>
+      </section>
+    </form>
+    <section id="owned-advice" class="owned-section" aria-live="polite" hidden></section>
+  </main>
+</body>
+</html>

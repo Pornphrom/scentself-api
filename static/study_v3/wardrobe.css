@@ -1,0 +1,47 @@
+.wardrobe{background:#f5f7f4;color:#243d37}
+.wardrobe-bar{height:64px;border-bottom:1px solid #d8e2dc;background:#fff;display:flex;align-items:center;gap:24px;padding:0 max(20px,calc((100% - 1000px)/2))}
+.wardrobe-bar a{color:#24564a;font-size:22px;font-weight:600;text-decoration:none}
+.wardrobe-bar span{font-size:14px;color:#586d65}
+.wardrobe-main{max-width:1040px;margin:0 auto;padding:28px 20px 64px}
+.wardrobe h1{font-size:28px;line-height:1.4;margin:0 0 4px;letter-spacing:0}
+.wardrobe h2{font-size:19px;margin:0 0 16px;letter-spacing:0}
+.wardrobe h2 span{font-weight:400;color:#67766f;font-size:14px;margin-left:8px}
+.owned-section{padding:24px 0;border-bottom:1px solid #d8e2dc}
+.wardrobe .search{max-width:640px}
+.wardrobe .search input{border-radius:8px}
+.wardrobe .search .results{border-radius:8px}
+.owned-list{padding:0;list-style:none;max-width:640px;margin:12px 0 0}
+.owned-list li{display:flex;gap:12px;align-items:center;justify-content:space-between;border-top:1px solid #d8e2dc;padding:10px 0;overflow-wrap:anywhere}
+.owned-list button{flex:none;border:1px solid #d8e2dc;background:#fff;color:#24564a;border-radius:4px;width:32px;height:32px;font-size:20px;line-height:1}
+.wardrobe fieldset{border:0;padding:0;margin:0;min-width:0}
+.wardrobe legend{font-weight:500;font-size:14px;margin-bottom:10px}
+.segmented{display:flex;flex-wrap:wrap;gap:0;width:fit-content;max-width:100%;border:1px solid #9ab2a5!important;border-radius:6px;overflow:hidden}
+.segmented label{position:relative;display:flex;align-items:center;cursor:pointer}
+.segmented input{position:absolute;opacity:0}
+.segmented span{padding:10px 18px;font-size:15px;display:block}
+.segmented label+label{border-left:1px solid #9ab2a5}
+.segmented input:checked+span{background:#24564a;color:#fff}
+.segmented input:focus-visible+span{outline:2px solid #327b95;outline-offset:-3px}
+.preference-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:30px;margin:24px 0 18px}
+.owned-families{display:flex;flex-wrap:wrap;gap:8px 14px}
+.owned-families label{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
+.owned-families input{accent-color:#24564a}
+.wardrobe select{width:100%;max-width:100%;padding:10px;background:#fff;border:1px solid #b9cbc1;border-radius:6px;font-size:14px;font-family:inherit}
+.wardrobe-error{background:#f9e9e5;color:#9c3b2b;padding:12px;border-radius:6px;font-size:14px}
+.owned-advice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:20px}
+.owned-card{background:#fff;border:1px solid #d8e2dc;border-radius:8px;overflow:hidden;min-width:0}
+.owned-card img{display:block;height:150px;width:100%;object-fit:contain;margin:16px 0}
+.owned-card .missing-photo{height:150px;display:grid;place-items:center;color:#718078}
+.owned-card-body{padding:16px}
+.owned-card h3{font-size:17px;line-height:1.45;margin:4px 0 10px;overflow-wrap:anywhere}
+.owned-card .rank{font-size:13px;color:#536b60}
+.owned-card .brand{font-size:13px;color:#69796f}
+.owned-card .facts{font-size:13px;line-height:1.5;color:#53665b}
+.owned-card ul{padding-left:18px;font-size:14px;line-height:1.6}
+.owned-card .caution{color:#865429;font-size:13px}
+.owned-card a{font-size:13px;color:#24564a}
+.wardrobe .btn{border-radius:6px}
+.wardrobe .sub{overflow-wrap:anywhere}
+.wardrobe .menu-pop a{display:block}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:680px){.preference-grid{grid-template-columns:1fr;gap:22px}.owned-advice-grid{grid-template-columns:1fr}.wardrobe-main{padding:20px 16px 48px}.wardrobe-bar{padding:0 16px;gap:20px}.wardrobe h1{font-size:25px}.segmented{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.segmented span{padding:10px 5px;text-align:center;font-size:14px;width:100%}.segmented label{min-width:0}.owned-card{display:grid;grid-template-columns:96px minmax(0,1fr)}.owned-card img{height:120px;margin:20px 0}.owned-card .missing-photo{height:120px}.owned-card-body{padding:16px 12px}.wardrobe .btn{width:100%;white-space:normal}}

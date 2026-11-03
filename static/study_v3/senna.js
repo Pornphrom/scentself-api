@@ -122,16 +122,29 @@ function extrasForm() {
     <label class="lbl" for="outfit">วันนั้นจะแต่งตัวแบบไหน</label><textarea id="outfit" rows="2" maxlength="300" placeholder="เช่น เสื้อเชิ้ตขาว กางเกงสแล็กส์">${esc(d.outfit || "")}</textarea>
     <div class="row-end"><button class="btn" type="button" id="extras-go">ใช้ข้อมูลนี้ แล้วดูตัวเลือก</button></div></div>`);
 }
-function shelf(set, title) {
-  return raw(`<div class="shelf-wrap"><div class="shelf-title"><b>${esc(title)}</b><span>เลื่อนดูได้ 3 ขวด</span></div><div class="shelf">${set.items.map(bottle).join("")}</div></div>`);
+function compareSets(sets) {
+  const [a, b] = sets.map(s => s.items.map(it => it.id));
+  const shared = [...new Set(a.filter(id => b.includes(id)))];
+  return {shared_item_ids: shared, overlap_count: shared.length,
+    identical_items: shared.length === a.length && shared.length === b.length,
+    identical_order: a.length === b.length && a.every((id, i) => id === b[i])};
+}
+function comparisonText(comparison, total) {
+  if (!comparison.overlap_count) return "นี่คือชุดที่ 2 ค่ะ";
+  if (comparison.identical_order) return `ทั้งสองชุดมีน้ำหอมและลำดับตรงกันทั้ง ${total} รุ่นค่ะ`;
+  if (comparison.identical_items) return `ทั้งสองชุดมีน้ำหอมเหมือนกันทั้ง ${total} รุ่น แต่ลำดับต่างกันค่ะ`;
+  return `นี่คือชุดที่ 2 ค่ะ มีรุ่นที่อยู่ทั้งสองชุด ${comparison.overlap_count} จาก ${total} รุ่น`;
+}
+function shelf(set, title, shared = []) {
+  return raw(`<div class="shelf-wrap"><div class="shelf-title"><b>${esc(title)}</b><span>เลื่อนดูได้ ${set.items.length} ขวด</span></div><div class="shelf">${set.items.map(it => bottle(it, shared)).join("")}</div></div>`);
 }
 function famKeyByThai(label) { return Object.keys(config.families).find(x => config.families[x] === label) || "none"; }
-function bottle(it) {
+function bottle(it, shared = []) {
   const c = famKeyByThai(it.family);
   const reasons = (it.explanation_reason_ids || [0, 1, 2]).map(i => it.reasons[i]).filter(Boolean);
   return `<article class="bottle c-${c}"><div class="pic">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(it.brand + " " + it.name)}" referrerpolicy="no-referrer" loading="lazy">` : '<span class="ph"></span>'}</div>
     <div class="body"><span class="brand">${esc(it.brand)}</span><h4>${esc(it.name)}</h4>
-    <div class="facts"><span class="fact dot">${esc(it.family)}</span><span class="fact">${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</span><span class="fact ${it.over_budget ? "warn" : ""}">${esc(it.price)}</span></div>
+    <div class="facts">${shared.includes(it.id) ? '<span class="fact shared">อยู่ทั้งสองชุด</span>' : ""}<span class="fact dot">${esc(it.family)}</span><span class="fact">${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</span><span class="fact ${it.over_budget ? "warn" : ""}">${esc(it.price)}</span></div>
     <div class="why">ที่เลือกขวดนี้เพราะ<ul>${reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
     <button type="button" class="more" aria-expanded="false">ราคาและที่วางขาย</button><div class="more-text" hidden><p>${esc(it.availability || "ยังไม่มีข้อมูลการวางขาย")}</p><p>${esc(it.price_evidence || "ยังไม่มีหลักฐานราคา")}</p><p>ราคาและสินค้าอาจเปลี่ยนแปลง ควรตรวจกับร้านอีกครั้ง</p></div></div></article>`;
 }
@@ -229,12 +242,13 @@ function build() {
   if (session.sets) { d.res = {sets: session.sets, pop: session.families_from_popularity, labels: session.selected_family_labels}; save(); }
   if (!d.res) { B.push(senna("บันทึกเรียบร้อยแล้วค่ะ")); return {B, C}; }
   const [s1, s2] = d.res.sets;
+  const comparison = compareSets(d.res.sets), shared = d.seen2 ? comparison.shared_item_ids : [];
   B.push(senna(`<p>ได้แล้วค่ะ นี่คือชุดที่ 1 ลองเลื่อนดูทีละขวดนะคะ</p>${d.res.pop ? `<p>เริ่มจากแนวที่คนนิยมสำหรับโอกาสนี้: ${esc(d.res.labels.join(" และ "))}</p>` : ""}`));
-  B.push(shelf(s1, "ชุดที่ 1"));
+  B.push(shelf(s1, "ชุดที่ 1", shared));
   if (st === "set1") { C.chips = [{label: "ขอดูอีกชุด", act: () => { d.seen2 = true; save(); render(); }}]; return {B, C}; }
   B.push(user("ขอดูอีกชุด"));
-  B.push(senna(`นี่คือชุดที่ 2 ค่ะ`));
-  B.push(shelf(s2, "ชุดที่ 2"));
+  B.push(senna(esc(comparisonText(comparison, s2.items.length))));
+  B.push(shelf(s2, "ชุดที่ 2", shared));
   B.push(senna(`<p>ดูครบทั้งสองชุดแล้ว ขอความเห็นสั้น ๆ นะคะ</p><p>เลื่อนขึ้นไปดูอีกครั้งได้ค่ะ</p>`));
   if (st === "relevance") { B.push(checkin("rel-form", "ความเห็นต่อคำแนะนำ", "ทั้งสองชุดตรงใจแค่ไหน", RELEVANCE, d.ans, "ส่งความเห็น")); return {B, C}; }
   B.push(user("ให้คะแนนทั้งสองชุดแล้ว"));
@@ -304,6 +318,7 @@ function updateBar() {
   $("#status").textContent = config.mode === "pilot" ? "ที่ปรึกษาน้ำหอม (รอบทดลอง)" : "ที่ปรึกษาน้ำหอม";
   $("#mode-note").textContent = config.mode === "pilot" ? "รอบทดลองระบบ ข้อมูลไม่นับรวมผลวิจัยหลัก" : "รอบเก็บข้อมูลวิจัย";
   $("#withdraw").hidden = !session;
+  $("#wardrobe-link").hidden = !!session && session.state !== "complete";
 }
 
 // ---------- actions ----------

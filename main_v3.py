@@ -14,9 +14,10 @@ load_dotenv()
 
 from study.config import Settings
 from study.routes import make_router
+from study.wardrobe import make_wardrobe_router
 from study_v3_adapter import EngineAdapterV3
 
-UI_VERSION = "senna-chat-v3-scenario-en-20261103"
+UI_VERSION = "senna-chat-v3-overlap-20261104"
 STATIC = Path(__file__).resolve().parent / "static" / "study_v3"
 
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
@@ -27,7 +28,9 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.go
 def create_app(settings=None):
     settings = dataclasses.replace(settings or Settings.from_env(), ui_version=UI_VERSION)
     app = FastAPI(title="ScentSelf Senna v3", docs_url=None, redoc_url=None)
-    app.include_router(make_router(settings, adapter=EngineAdapterV3()))
+    adapter = EngineAdapterV3()
+    app.include_router(make_router(settings, adapter=adapter))
+    app.include_router(make_wardrobe_router(adapter))
     app.mount("/senna/assets", StaticFiles(directory=str(STATIC)), name="senna-v3-assets")
 
     @app.middleware("http")
@@ -46,6 +49,11 @@ def create_app(settings=None):
     def senna_page():
         return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
                                                              "X-Content-Type-Options": "nosniff", "Content-Security-Policy": CSP})
+
+    @app.get("/senna/wardrobe", include_in_schema=False)
+    def wardrobe_page():
+        return FileResponse(STATIC / "wardrobe.html", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+                                                                 "X-Content-Type-Options": "nosniff", "Content-Security-Policy": CSP})
     return app
 
 
