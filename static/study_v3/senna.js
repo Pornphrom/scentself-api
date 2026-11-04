@@ -375,6 +375,25 @@ async function leaveOwnedChat() {
 function ownedStep(stage) {
   d.ownedChat.stage = stage; delete d.ownedChat.result; lastError = ""; save(); render();
 }
+function ownedAdviceSummary(items) {
+  if (!items.length) return "ยังไม่มีข้อมูลพอประเมินขวดที่เลือกค่ะ";
+  if (items.every(it => it.assessment_code === "stronger_than_requested"))
+    return "ขวดที่เลือกกระจายกลิ่นชัดกว่าที่อยากได้ทั้งหมดค่ะ จึงยังไม่มีขวดที่ตรงระดับกลิ่นที่ขอ";
+  const first = items[0];
+  return items.length > 1
+    ? `ถ้าจะเลือกจากขวดที่มี ให้พิจารณา ${perfumeLabel(first)} ก่อนสำหรับ${scenarioLabel(d.ownedChat.scenario)} พร้อมดูข้อควรระวังด้านล่างค่ะ`
+    : `${perfumeLabel(first)} กับ${scenarioLabel(d.ownedChat.scenario)}:`;
+}
+function ownedAdviceBlocks(result, id = "owned-answer") {
+  const blocks = [senna(`<div id="${id}"><p>${esc(ownedAdviceSummary(result.items))}</p><p>${esc(result.items[0]?.assessment)}</p><p>${result.families_from_popularity ? "อ้างอิงแนวที่ผู้ตอบแบบสอบถามมักเลือกในโอกาสนี้" : "เทียบกับแนวกลิ่นที่คุณเลือก"} ไม่ใช่กฎตายตัว และไม่จำเป็นต้องซื้อขวดใหม่ค่ะ</p></div>`)];
+  for (const it of result.items) blocks.push(widget(`<article class="owned-chat-advice">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(perfumeLabel(it))}" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><h3>${esc(perfumeLabel(it))}</h3><p class="owned-verdict">${esc(it.assessment)}</p><p class="sub">${esc(it.family)} · ${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</p><ul>${it.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>${it.cautions.map(caution => `<p class="owned-caution">${esc(caution)}</p>`).join("")}</div></article>`));
+  return blocks;
+}
+function scrollToOwnedSection(id) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  window.scrollTo({top: Math.max(0, target.getBoundingClientRect().top + scrollY - $(".bar").offsetHeight - 12), behavior: "auto"});
+}
 function buildOwnedChat() {
   const o = d.ownedChat, B = [], C = {chips: [], say: null};
   B.push(senna("มาดูว่าขวดที่คุณมีจะใช้กับโอกาสไหนได้บ้างค่ะ รอบทดลองจะขอความยินยอมและประเมินความมั่นใจก่อน–หลัง คุณเลือกไม่ร่วมทดลองได้ค่ะ"));
@@ -419,15 +438,16 @@ function buildOwnedChat() {
   }
   B.push(user(o.sillage === null ? "ยังไม่กำหนด" : SILLAGE[o.sillage].b));
   if (o.stage.startsWith("decision-")) return buildOwnedDecision(B, C, o);
-  if (o.stage.startsWith("trial-")) return buildOwnedTrial(B, C, o);
+  if (o.stage.startsWith("trial-")) {
+    if (decisionTask() === FOLLOWUP_TASK && o.result?.items?.length) {
+      B.push(raw(`<details id="owned-advice-review" class="owned-advice-review"><summary>คำแนะนำสำหรับขวดที่คุณมี</summary>${ownedAdviceBlocks(o.result, "owned-review-answer").map(block => block.html).join("")}</details>`));
+    }
+    return buildOwnedTrial(B, C, o);
+  }
   if (o.stage === "generating") { B.push({kind: "typing", html: typingHTML()}); return {B, C}; }
-  const result = o.result, first = result.items[0];
-  const allStronger = result.items.every(it => it.assessment_code === "stronger_than_requested");
-  const summary = allStronger ? "ขวดที่เลือกกระจายกลิ่นชัดกว่าที่อยากได้ทั้งหมดค่ะ จึงยังไม่มีขวดที่ตรงระดับกลิ่นที่ขอ" : o.items.length > 1
-    ? `ถ้าจะเลือกจากขวดที่มี ให้พิจารณา ${perfumeLabel(first)} ก่อนสำหรับ${scenarioLabel(o.scenario)} พร้อมดูข้อควรระวังด้านล่างค่ะ`
-    : `${perfumeLabel(first)} กับ${scenarioLabel(o.scenario)}:`;
-  B.push(senna(`<div id="owned-answer"><p>${esc(summary)}</p><p>${esc(first.assessment)}</p><p>${result.families_from_popularity ? "อ้างอิงแนวที่ผู้ตอบแบบสอบถามมักเลือกในโอกาสนี้" : "เทียบกับแนวกลิ่นที่คุณเลือก"} ไม่ใช่กฎตายตัว และไม่จำเป็นต้องซื้อขวดใหม่ค่ะ</p></div>`));
-  for (const it of result.items) B.push(widget(`<article class="owned-chat-advice">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(perfumeLabel(it))}" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><h3>${esc(perfumeLabel(it))}</h3><p class="owned-verdict">${esc(it.assessment)}</p><p class="sub">${esc(it.family)} · ${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</p><ul>${it.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>${it.cautions.map(caution => `<p class="owned-caution">${esc(caution)}</p>`).join("")}</div></article>`));
+  B.push(raw('<h3 class="owned-advice-heading">คำแนะนำสำหรับขวดที่คุณมี</h3>'));
+  if (o.stage === "alternatives-result") B.push(raw('<button type="button" class="chip" id="back-to-alternatives">กลับไปดูขวดใหม่เพิ่มเติม</button>'));
+  B.push(...ownedAdviceBlocks(o.result));
   if (o.trial?.server?.state === "complete" && o.trial.completedContext === JSON.stringify(ownedContext())) {
     B.push(senna(`<p>บันทึกผลทดลองเลือกใช้แล้วค่ะ ไม่นับรวมกับการเลือกซื้อ</p><p class="receipt owned-receipt">รหัสรอบทดลอง: ${esc(o.trial.id)}</p>`));
   } else if (o.stage === "result") {
@@ -454,6 +474,8 @@ function compareOwnedChat() {
 function wireOwnedChat() {
   const o = d.ownedChat;
   if (o.stage === "entry-consent" || o.stage.startsWith("trial-")) { wireOwnedTrial(); return; }
+  const back = $("#back-to-alternatives");
+  if (back) back.onclick = () => scrollToOwnedSection("alternatives-answer");
   thread.querySelectorAll("[data-owned-add]").forEach(button => button.onclick = () => {
     if (o.items.length >= 10) { lastError = "เลือกได้ไม่เกิน 10 ขวดค่ะ"; render(); return; }
     const item = o.matches.find(it => it.id === Number(button.dataset.ownedAdd));

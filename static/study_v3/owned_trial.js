@@ -166,12 +166,16 @@ function buildOwnedTrial(B, C, o) {
   }
   if (st === "trial-loading") { B.push({kind: "typing", html: typingHTML()}); return {B, C}; }
   const sets = t.server.sets, shared = t.secondShown ? compareSets(sets).shared_item_ids : [];
-  B.push(senna(followup ? "ชุดที่ 1 เป็นขวดใหม่ที่ไม่อยู่ในขวดที่คุณเลือกไว้ค่ะ" : "ชุดที่ 1 เป็นการจัดอันดับจากขวดที่คุณมีค่ะ")); B.push(shelf(sets[0], followup ? "ชุดที่ 1 · ขวดใหม่เพิ่มเติม" : "ชุดที่ 1 · ขวดที่มี", shared));
+  B.push(senna(followup ? "ชุดที่ 1 เป็นขวดใหม่ที่ไม่อยู่ในขวดที่คุณเลือกไว้ค่ะ" : "มาดูก่อนว่าขวดที่คุณมีเหมาะกับโอกาสนี้แค่ไหนค่ะ นี่คือคำแนะนำจากขวดเดิมชุดที่ 1"));
+  if (!followup) B.push(senna(`<div class="owned-set-advice" data-owned-slot="first"><p>${esc(ownedAdviceSummary(sets[0].items))}</p><p>ดูเหตุผลและข้อควรระวังของแต่ละขวดด้านล่างได้ค่ะ ยังไม่จำเป็นต้องซื้อขวดใหม่</p></div>`));
+  B.push(shelf(sets[0], followup ? "ชุดที่ 1 · ขวดใหม่เพิ่มเติม" : "ชุดที่ 1 · คำแนะนำขวดที่คุณมี", shared));
   if (st === "trial-first") {
     C.chips = [{label: followup ? "ดูชุดที่ 2 ของขวดใหม่" : "ดูชุดที่ 2 จากขวดที่มี", act: () => { t.secondShown = true; o.stage = "trial-ratings"; save(); render(); }}];
     return {B, C};
   }
-  B.push(senna(comparisonText(compareSets(sets), sets[1].items.length))); B.push(shelf(sets[1], followup ? "ชุดที่ 2 · ขวดใหม่เพิ่มเติม" : "ชุดที่ 2 · ขวดที่มี", shared));
+  B.push(senna(comparisonText(compareSets(sets), sets[1].items.length)));
+  if (!followup) B.push(senna(`<div class="owned-set-advice" data-owned-slot="second"><p>${esc(ownedAdviceSummary(sets[1].items))}</p></div>`));
+  B.push(shelf(sets[1], followup ? "ชุดที่ 2 · ขวดใหม่เพิ่มเติม" : "ชุดที่ 2 · คำแนะนำขวดที่คุณมี", shared));
   if (st === "trial-ratings") {
     B.push(checkin("owned-ratings-form", "ความตรงใจของคำแนะนำ", followup ? "สองชุดช่วยพิจารณาขวดใหม่แค่ไหน" : "สองชุดช่วยเลือกขวดสำหรับโอกาสนี้แค่ไหน", RELEVANCE, t.answers, "บันทึกคะแนนสองชุด"));
     return {B, C};
@@ -280,7 +284,8 @@ function buildOwnedAlternatives(B, C, o) {
     B.push(senna('<p class="private-advice-notice" role="status">รอบนี้เป็นคำแนะนำอย่างเดียว ยังไม่มีคะแนนก่อน–หลังหรือผลเปรียบเทียบที่ส่งไว้ค่ะ</p>'));
     B.push(shelf({items: o.alternatives.items}, "คำแนะนำขวดใหม่เพิ่มเติม"));
   }
-  C.chips = [{label: "เลือกใช้ขวดเดิม", act: chooseExistingBottle}, {label: "จบการคุย", act: () => finishOwnedDecision(null)}, {label: "เปลี่ยนงบ", act: () => { o.budgetSet = false; requestOwnedAlternatives(); }},
+  C.chips = [{label: "ดูคำแนะนำขวดที่มี", act: () => scrollToOwnedSection("owned-answer")},
+    {label: "เลือกใช้ขวดเดิม", act: chooseExistingBottle}, {label: "จบการคุย", act: () => finishOwnedDecision(null)}, {label: "เปลี่ยนงบ", act: () => { o.budgetSet = false; requestOwnedAlternatives(); }},
     {label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}];
   if (config.mode === "pilot" && t?.server?.state !== "complete") C.chips.unshift({label: "ประเมินคำแนะนำสองชุด", act: () => { o.activeTrialTask = FOLLOWUP_TASK; offerOwnedTrial(); }});
   return {B, C};

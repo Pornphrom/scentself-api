@@ -4,7 +4,7 @@
   "versions": {
     "catalog": "catalog_v3.2_thai_notes_20261103",
     "engine": "v2.2",
-    "ui": "senna-chat-v3-family-consent-20261104",
+    "ui": "senna-chat-v3-owned-advice-20261105",
     "llm": "gemini-3.5-flash-lite",
     "llm_role": "extractive"
   },
@@ -19,7 +19,7 @@
     ".env.example": "073ceb6e269f5c7a9c64a21b6f01f6bbc14d334ed772c31c27bed16ceb1bfa01",
     "requirements.txt": "5c02b9eeeddfdd355dba5a99f1d843157134f776c41d9b75d70ae5197da1984c",
     "main_pilot.py": "ac8ef2836b68ced880cbdd237be4d54a04bb57380336707d905ee87d2a1ae3fd",
-    "main_v3.py": "6d68de52fe0e554e481df848fab81bea9728306c3fcbdf4d11a60a3398542ff9",
+    "main_v3.py": "98d9d1507eda5e0b2e1811eadab208fea47e0f46738270be5817c185c175973a",
     "study_v3_adapter.py": "396ae6bf29fa2c1bb9437e8182c7bbf7ff99ecabeb0e542eefc555f47f13cd25",
     "study/__init__.py": "fafe36c4e2460906093e32938d1574d1631fb410ca8e7e1ff7e94042ee481952",
     "study/config.py": "8e467f92aeaee8fa5b7c73025df7a9499425a4a427859ea7875a3d10d85c6bf9",
@@ -36,8 +36,8 @@
     "engine_v2/bridge_notes.json": "47cb4057dd042a480e2c62b761623e49154f6c715e406ffc5740b92098763c0c",
     "engine_v2/catalog_v3_2.json": "4219db72512b5a258d66ca46e7b02489dfcd546b214fad878636c0d80ecafefb",
     "static/study_v3/index.html": "4b481af9a82efb9dce5b8a696043e3b3a4834c994142d16929245eead8812106",
-    "static/study_v3/senna.css": "18894916341833f5dff33155bf06c58282ecebfe0a9647df897e47c0f52c9d97",
-    "static/study_v3/senna.js": "23efb5332755e436c31c4ea0feab900b4754bbdfbbe7b0d2b483f5d922b5a182",
+    "static/study_v3/senna.css": "7af8f724114b8b3854ef1ad4c3eae5360203681881be79a0606795aa1e54f6df",
+    "static/study_v3/senna.js": "5c97b4991d8b4b66d32a811156ad6324f5ca1a86ef940dec980dbdf7b4971a8f",
     "static/study_v3/images_v3.json": "82cb0621c24a14de864015fb4c14d2e160b216ddbdf633bb418a47e7ad5e5a8b",
     "main_pilot_free.py": "38118651ff8983bf7bd314200a244856581f6734abb74d895435e0f08a18e68f",
     "requirements-free.txt": "c827a51e5f94403b146cc45b2acebaa433b81284d8945a570a720b9c7b84c6fd",
@@ -48,6 +48,6 @@
     "static/study_v3/wardrobe.js": "b89c997ae207f1b09faf2d21f83e857fd8f2d8deb096f4643c8097c774bae185",
     "static/study_v3/wardrobe.css": "2a1d0844a8dfcfa9db8a514d1140b56411c0da5713acb873a251b6c6fc7ca36b",
     "study/owned_study.py": "5b3247b13df6fcac91b6e4712a1b9010d4325f6754b8a6488dbcc92ef9bcb0ee",
-    "static/study_v3/owned_trial.js": "18b4dca0d99e6f4c66d30c2200b8a3d0f747aae73fcedad39df883fd4a10a54f"
+    "static/study_v3/owned_trial.js": "1a21be23f9b0fc1140c951925a8008b59e411aec7d231cac4defe0e9ee0ea698"
   }
 }
