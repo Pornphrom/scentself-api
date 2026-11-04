@@ -17,7 +17,7 @@ from study.routes import make_router
 from study.wardrobe import make_wardrobe_router
 from study_v3_adapter import EngineAdapterV3
 
-UI_VERSION = "senna-chat-v3-overlap-20261104"
+UI_VERSION = "senna-chat-v3-owned-dialogue-20261104"
 STATIC = Path(__file__).resolve().parent / "static" / "study_v3"
 
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "

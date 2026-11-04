@@ -61,11 +61,26 @@ def assess_owned(adapter, body):
             cautions.append(f"ระดับกลิ่นที่บันทึกเป็น{SILLAGE_TH[item['sillage']]} ต่างจาก{SILLAGE_TH[body.sillage]}ที่เลือก")
         if item["sillage_source"] != "vote":
             cautions.append("ระดับการกระจายกลิ่นเป็นค่าประมาณ ไม่ใช่ผลโหวตจริง")
+        if body.sillage is not None and item["sillage_source"] == "vote" and item["sillage"] > body.sillage:
+            assessment_code = "stronger_than_requested"
+            assessment = "ควรระวัง: การกระจายกลิ่นชัดกว่าระดับที่ต้องการ"
+        elif body.sillage is not None and item["sillage_source"] == "vote" and item["sillage"] < body.sillage:
+            assessment_code = "weaker_than_requested"
+            assessment = "น่าพิจารณา แต่การกระจายกลิ่นเบากว่าระดับที่ต้องการ"
+        elif item["sillage_source"] != "vote":
+            assessment_code = "estimated"
+            assessment = "น่าพิจารณาจากแนวกลิ่น แต่ข้อมูลการกระจายกลิ่นยังเป็นค่าประมาณ"
+        elif families and item["family"] not in families:
+            assessment_code = "family_differs"
+            assessment = "ควรเทียบกลิ่นก่อน: แนวหลักต่างจากแนวที่อยากได้"
+        else:
+            assessment_code = "consider"
+            assessment = f"เป็นตัวเลือกที่น่าพิจารณาสำหรับ{SCENARIOS[body.scenario][2:]}ตามข้อมูลกลิ่น"
         items.append({"id": i, "brand": item["brand"], "name": item["name"], "family": item["family"],
                       "sillage": SILLAGE_TH[item["sillage"]], "sillage_estimated": item["sillage_source"] != "vote",
                       "image_url": adapter.images.get(item["url"], ""), "url": item["url"],
-                      "reasons": reasons, "cautions": cautions})
-    return {"mode": "owned_collection", "policy_version": "owned-prototype-v1-20261104", "research_data_saved": False, "scenario": SCENARIOS[body.scenario],
+                      "reasons": reasons, "cautions": cautions, "assessment": assessment, "assessment_code": assessment_code})
+    return {"mode": "owned_collection", "policy_version": "owned-prototype-v1.1-20261104", "research_data_saved": False, "scenario": SCENARIOS[body.scenario],
             "families": result["request"]["families"], "families_from_popularity": not bool(body.families),
             "items": items, "engine": adapter.engine_version, "catalog_sha256": adapter.catalog_hash}
 

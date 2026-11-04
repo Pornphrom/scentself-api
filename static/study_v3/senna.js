@@ -102,8 +102,8 @@ function ringsSVG(level) {
   const r = [16, 30, 44];
   return `<svg viewBox="0 0 120 96" aria-hidden="true">${r.map((rad, i) => `<circle class="ring ${i === level ? "on" : ""}" cx="60" cy="48" r="${rad}" ${i > level ? 'data-far="1"' : ""}/>`).join("")}<circle class="me" cx="60" cy="48" r="6"/><circle class="other" cx="${60 + [14, 26, 40][level]}" cy="${48 - [6, 12, 16][level]}" r="4"/></svg>`;
 }
-function familyPicker(selected) {
-  return widget(`<form id="fam-form"><h3>เลือกได้ 1–2 แนว</h3><p class="sub">แตะเพื่อเลือก แตะอีกครั้งเพื่อเอาออก</p><div class="families">${Object.entries(config.families).map(([k, v]) =>
+function familyPicker(selected, id = "fam-form") {
+  return widget(`<form id="${id}"><h3>เลือกได้ 1–2 แนว</h3><p class="sub">แตะเพื่อเลือก แตะอีกครั้งเพื่อเอาออก</p><div class="families">${Object.entries(config.families).map(([k, v]) =>
     `<button type="button" class="fam c-${k}" data-fam="${k}" aria-pressed="${selected.includes(k)}"><span class="swatch"></span><b>${esc(v)}</b><small>${esc(FAM[k].ex)}</small></button>`).join("")}
     <button type="button" class="fam unsure" data-fam="unsure" aria-pressed="false"><b>ยังไม่แน่ใจ</b><small>ให้ Senna เริ่มจากแนวที่คนนิยมสำหรับโอกาสนี้</small></button></div>
     <div class="row-end"><button class="btn" type="submit" ${selected.length ? "" : "disabled"}>เลือกแนวนี้</button></div></form>`);
@@ -151,6 +151,8 @@ function bottle(it, shared = []) {
 
 // ---------- the conversation as a function of state ----------
 function stage() {
+  if (d.intent === "owned") return "owned-" + (d.ownedChat?.stage || "scenario");
+  if (!session && !d.intent) return "purpose";
   if (!session) return "consent";
   if (session.state === "complete") return "done";
   if (!d.scenario) return "scenario";
@@ -168,9 +170,16 @@ function stage() {
   return "experience";
 }
 function build() {
+  if (d.intent === "owned") return buildOwnedChat();
   const B = [], st = stage(), C = {chips: [], say: null};
   if (notice && !session) B.push(raw(`<p class="note" role="status">${esc(notice)}</p>`));
-  B.push(senna(`<p>สวัสดีค่ะ ฉันชื่อ Senna จะช่วยหาน้ำหอมให้เข้ากับโอกาสที่คุณจะใช้</p><p>คุยกันประมาณ 10–15 นาทีค่ะ</p>`));
+  B.push(senna(`<p>สวัสดีค่ะ ฉันชื่อ Senna จะช่วยเลือกน้ำหอมให้เข้ากับโอกาสที่คุณจะใช้</p>${st === "purpose" ? "" : "<p>คุยกันประมาณ 10–15 นาทีค่ะ</p>"}`));
+  if (st === "purpose") {
+    B.push(senna("วันนี้อยากหาน้ำหอมขวดใหม่ หรือให้ช่วยเลือกใช้จากขวดที่มีอยู่แล้วคะ"));
+    C.chips = [{label: "หาน้ำหอมขวดใหม่", act: () => { d.intent = "discover"; save(); render(); }},
+      {label: "เลือกใช้ขวดที่มี", act: enterOwnedChat}];
+    return {B, C};
+  }
   if (st === "consent") {
     B.push(senna(`ก่อนเริ่ม ขออนุญาตเรื่องข้อมูลสั้น ๆ นะคะ`));
     B.push(widget(`<form id="consent-form" class="consent"><h3>การเข้าร่วม ScentSelf</h3><ul>
@@ -207,7 +216,7 @@ function build() {
   if (st === "pre") { B.push(checkin("pre-form", "เช็กความรู้สึก ก่อนคุยเรื่องกลิ่น", "ตอนนี้คุณรู้สึกอย่างไร", config.confidence.map((q, i) => [`pre${i + 1}`, q]), d.pre, "ส่งคำตอบ")); return {B, C}; }
   B.push(user("ตอบเช็กความรู้สึกแล้ว"));
   if (isCollector()) {
-    B.push(senna(`<p>ขอบคุณค่ะ คุณมีน้ำหอมที่ชอบอยู่แล้ว ตัวไหนคะ</p><p>พิมพ์ชื่อแบรนด์หรือรุ่นได้เลย Senna จะหากลิ่นที่ใกล้เคียงให้ด้วย</p>`));
+    B.push(senna(`<p>ขอบคุณค่ะ มีน้ำหอมที่ชอบกลิ่นอยู่แล้ว ตัวไหนคะ</p><p>จะใช้เป็นตัวอ้างอิงเพื่อหาขวดใหม่ที่กลิ่นใกล้เคียงค่ะ</p>`));
     if (st === "fav") {
       if (d.fav_q) {
         B.push(user(d.fav_q));
@@ -297,6 +306,10 @@ function scrollEnd() {
     const msgs = thread.querySelectorAll(".msg.senna"), el = msgs[msgs.length - 1], last = thread.lastElementChild;
     if (!el || !last) return;
     const header = $(".bar").offsetHeight, comp = composer.offsetHeight;
+    if (d.intent === "owned" && d.ownedChat?.stage === "result" && $("#owned-answer")) {
+      const top = $("#owned-answer").closest(".msg").getBoundingClientRect().top + scrollY - header - 12;
+      window.scrollTo({top: Math.max(0, top), behavior: "auto"}); return;
+    }
     const toQuestion = el.getBoundingClientRect().top + scrollY - header - 12;          // newest question just under the top bar
     const toEnd = last.getBoundingClientRect().bottom + scrollY - (innerHeight - comp) + 16; // everything visible above the composer
     window.scrollTo({top: Math.max(0, Math.min(toQuestion, toEnd)), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
@@ -305,7 +318,7 @@ function scrollEnd() {
 function renderComposer(C) {
   composer.hidden = !busy && !C.chips.length && !C.say;
   if (composer.hidden) { composer.innerHTML = ""; return; }
-  if (busy) { composer.innerHTML = `<div class="composer-inner"><p class="hint">กำลังบันทึก…</p></div>`; return; }
+  if (busy) { composer.innerHTML = `<div class="composer-inner"><p class="hint">${d.intent === "owned" ? "กำลังดูข้อมูลขวดที่เลือก…" : "กำลังบันทึก…"}</p></div>`; return; }
   composer.innerHTML = `<div class="composer-inner">${C.chips.length ? `<div class="chips">${C.chips.map((c, i) => `<button type="button" class="chip ${c.soft ? "soft" : ""}" data-chip="${i}">${esc(c.label)}</button>`).join("")}</div>` : ""}
     ${C.say ? `<form class="say" id="say"><input id="say-input" autocomplete="off" maxlength="200" placeholder="${esc(C.say.ph)}" aria-label="พิมพ์ข้อความถึง Senna"><button type="submit" aria-label="ส่ง">${ICON.send}</button></form><p class="hint">${esc(C.say.hint || "ข้อความที่พิมพ์ใช้แค่ช่วยเลือกคำตอบในหน้านี้ ไม่ถูกส่งไปเก็บ")}</p>` : ""}</div>`;
   composer.querySelectorAll("[data-chip]").forEach(b => b.onclick = () => C.chips[Number(b.dataset.chip)].act());
@@ -315,10 +328,122 @@ function updateBar() {
   const st = stage(), step = ["consent", "scenario", "q6", "q5", "budget", "pre", "fav", "families", "sillage", "extras", "generating"].includes(st) ? "talk" : ["set1"].includes(st) ? "look" : st === "done" ? "end" : "feedback";
   const order = ["talk", "look", "feedback"];
   document.querySelectorAll("#journey li").forEach(li => { const i = order.indexOf(li.dataset.step), cur = order.indexOf(step); li.toggleAttribute("aria-current", false); li.classList.toggle("done", step === "end" || i < cur); if (i === cur) li.setAttribute("aria-current", "step"); });
-  $("#status").textContent = config.mode === "pilot" ? "ที่ปรึกษาน้ำหอม (รอบทดลอง)" : "ที่ปรึกษาน้ำหอม";
+  $("#journey").hidden = d.intent === "owned" || st === "purpose";
+  document.body.classList.toggle("owned-result", d.intent === "owned" && d.ownedChat?.stage === "result");
+  $("#status").textContent = d.intent === "owned" ? "ช่วยเลือกใช้ขวดที่มี" : config.mode === "pilot" ? "ที่ปรึกษาน้ำหอม (รอบทดลอง)" : "ที่ปรึกษาน้ำหอม";
   $("#mode-note").textContent = config.mode === "pilot" ? "รอบทดลองระบบ ข้อมูลไม่นับรวมผลวิจัยหลัก" : "รอบเก็บข้อมูลวิจัย";
   $("#withdraw").hidden = !session;
-  $("#wardrobe-link").hidden = !!session && session.state !== "complete";
+  $("#wardrobe-link").hidden = d.intent === "owned";
+  $("#goal-link").hidden = d.intent !== "owned";
+  $("#goal-link").textContent = session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "กลับไปเลือกเป้าหมาย";
+}
+
+// Owned-use advice has its own local conversation; it never submits study answers.
+async function enterOwnedChat() {
+  if (busy) return;
+  if (session && session.state !== "complete") {
+    if (!confirm("รอบนี้เป็นการทดลองหาขวดใหม่ หากเปลี่ยนเป็นเลือกใช้ขวดที่มี จะถอนตัวและลบคำตอบรอบนี้ ต้องการเปลี่ยนหรือไม่")) return;
+    return run(async () => {
+      await api(`/study/sessions/${creds.id}`, {method: "DELETE"});
+      clearAll(); d.intent = "owned"; d.ownedChat = {stage: "scenario", items: []}; $("#menu-pop").hidden = true; save();
+    });
+  }
+  d.intent = "owned"; d.ownedChat = {stage: "scenario", items: []}; lastError = ""; shown = 0;
+  $("#menu-pop").hidden = true; save(); render();
+}
+function leaveOwnedChat() {
+  if (busy) return;
+  d.intent = session ? "discover" : null; lastError = ""; $("#menu-pop").hidden = true; save(); render();
+}
+function ownedStep(stage) {
+  d.ownedChat.stage = stage; delete d.ownedChat.result; lastError = ""; save(); render();
+}
+function buildOwnedChat() {
+  const o = d.ownedChat, B = [], C = {chips: [], say: null};
+  B.push(senna("มาดูว่าขวดที่คุณมีอยู่จะใช้กับโอกาสไหนได้บ้างค่ะ รอบนี้ไม่ใช่แบบทดลองเลือกซื้อ และไม่บันทึกเป็นคำตอบวิจัย"));
+  B.push(user("เลือกใช้ขวดที่มี"));
+  B.push(senna("จะใช้น้ำหอมไปไหนหรือในโอกาสอะไรคะ"));
+  if (o.stage === "scenario") {
+    const choose = (scenario, said = "") => { o.scenario = scenario; o.said = said; ownedStep("bottles"); };
+    C.chips = Object.keys(config.scenarios).map(k => ({label: scenarioLabel(k), act: () => choose(k)}));
+    C.say = {ph: "เช่น Go party หรือไปทำงาน", act: text => {
+      const hint = understand(text);
+      if (!hint.scenario) { lastError = "ยังไม่แน่ใจว่าเป็นโอกาสไหน เลือกจากด้านล่างได้ค่ะ"; render(); return; }
+      o.familySelection = hint.families; o.sillage = hint.sillage ?? null; choose(hint.scenario, text);
+    }};
+    return {B, C};
+  }
+  B.push(user(o.said || scenarioLabel(o.scenario)));
+  B.push(senna(`จะใช้${esc(scenarioLabel(o.scenario))}นะคะ คุณมีน้ำหอมขวดไหนอยู่บ้าง`));
+  if (o.stage === "bottles") {
+    if (o.items.length) B.push(widget(`<ul class="owned-chat-list">${o.items.map(it => `<li><span>${esc(perfumeLabel(it))}</span><button type="button" data-owned-remove="${it.id}" title="เอาออก" aria-label="เอา ${esc(perfumeLabel(it))} ออก">×</button></li>`).join("")}</ul>`));
+    if (o.query) {
+      B.push(user(o.query));
+      B.push(senna(o.matches?.length ? "เลือกรุ่นที่ตรงกับขวดของคุณค่ะ" : "ยังไม่พบรุ่นนี้ในรายการ จึงยังประเมินขวดนี้ไม่ได้ค่ะ ลองชื่อแบรนด์หรือชื่อภาษาอังกฤษอีกครั้งได้"));
+      if (o.matches?.length) B.push(widget(`<div class="fav-pick">${o.matches.map(it => `<button type="button" class="toggle" data-owned-add="${it.id}">${esc(perfumeLabel(it))}</button>`).join("")}</div>`));
+    }
+    C.say = {ph: "ชื่อขวดที่มี เช่น CK One หรือ Chanel", hint: "ค้นหารุ่นในฐานข้อมูล ข้อความค้นหาไม่ถูกบันทึกเป็นคำตอบวิจัย", act: text => run(async () => {
+      const result = await api(`/search?q=${encodeURIComponent(text)}`);
+      o.query = text; o.matches = result.items.filter(it => !o.items.some(p => p.id === it.id)); save();
+    })};
+    if (o.items.length) C.chips.push({label: "ใช้ขวดที่เลือก", act: () => ownedStep("families")});
+    return {B, C};
+  }
+  B.push(user(o.items.map(perfumeLabel).join(" / ")));
+  B.push(senna("สำหรับโอกาสนี้อยากได้กลิ่นแนวไหน หรือให้ดูตามโอกาสที่บอกก็ได้ค่ะ"));
+  if (o.stage === "families") { B.push(familyPicker(o.familySelection || [], "owned-fam-form")); return {B, C}; }
+  B.push(user(o.families.length ? o.families.map(famLabel).join(" / ") : "ให้ดูตามโอกาส"));
+  B.push(senna("อยากให้กลิ่นอยู่ใกล้ตัว หรือกระจายถึงคนรอบข้างแค่ไหนคะ"));
+  if (o.stage === "sillage") {
+    B.push(sillagePicker(o.sillage)); C.chips = [{label: "ยังไม่กำหนด", act: () => { o.sillage = null; compareOwnedChat(); }}]; return {B, C};
+  }
+  B.push(user(o.sillage === null ? "ยังไม่กำหนด" : SILLAGE[o.sillage].b));
+  if (o.stage === "generating") { B.push({kind: "typing", html: typingHTML()}); return {B, C}; }
+  const result = o.result, first = result.items[0];
+  const allStronger = result.items.every(it => it.assessment_code === "stronger_than_requested");
+  const summary = allStronger ? "ขวดที่เลือกกระจายกลิ่นชัดกว่าที่อยากได้ทั้งหมดค่ะ จึงยังไม่มีขวดที่ตรงระดับกลิ่นที่ขอ" : o.items.length > 1
+    ? `ถ้าจะเลือกจากขวดที่มี ให้พิจารณา ${perfumeLabel(first)} ก่อนสำหรับ${scenarioLabel(o.scenario)} พร้อมดูข้อควรระวังด้านล่างค่ะ`
+    : `${perfumeLabel(first)} กับ${scenarioLabel(o.scenario)}:`;
+  B.push(senna(`<div id="owned-answer"><p>${esc(summary)}</p><p>${esc(first.assessment)}</p><p>${result.families_from_popularity ? "อ้างอิงแนวที่ผู้ตอบแบบสอบถามมักเลือกในโอกาสนี้" : "เทียบกับแนวกลิ่นที่คุณเลือก"} ไม่ใช่กฎตายตัว และไม่จำเป็นต้องซื้อขวดใหม่ค่ะ</p></div>`));
+  for (const it of result.items) B.push(widget(`<article class="owned-chat-advice">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(perfumeLabel(it))}" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><h3>${esc(perfumeLabel(it))}</h3><p class="owned-verdict">${esc(it.assessment)}</p><p class="sub">${esc(it.family)} · ${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</p><ul>${it.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>${it.cautions.map(caution => `<p class="owned-caution">${esc(caution)}</p>`).join("")}</div></article>`));
+  B.push(senna("ความชอบจริงอาจต่างจากข้อมูลกลิ่นค่ะ ลองเทียบกับกลิ่นที่คุณเคยดมและบรรยากาศจริงของงานด้วย"));
+  C.chips = [{label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}, {label: "เพิ่มหรือเปลี่ยนขวด", act: () => ownedStep("bottles")},
+    {label: session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "เปลี่ยนเป้าหมาย", soft: true, act: leaveOwnedChat}];
+  return {B, C};
+}
+function compareOwnedChat() {
+  const o = d.ownedChat;
+  run(async () => {
+    o.stage = "generating"; save(); render();
+    try {
+      o.result = await api("/wardrobe/compare", {method: "POST", body: JSON.stringify({owned_ids: o.items.map(it => it.id), scenario: o.scenario, families: o.families, sillage: o.sillage})});
+      o.stage = "result"; save();
+    } catch (error) { o.stage = "sillage"; save(); throw error; }
+  });
+}
+function wireOwnedChat() {
+  const o = d.ownedChat;
+  thread.querySelectorAll("[data-owned-add]").forEach(button => button.onclick = () => {
+    if (o.items.length >= 10) { lastError = "เลือกได้ไม่เกิน 10 ขวดค่ะ"; render(); return; }
+    const item = o.matches.find(it => it.id === Number(button.dataset.ownedAdd));
+    if (item && !o.items.some(it => it.id === item.id)) o.items.push(item);
+    o.query = ""; o.matches = []; ownedStep("bottles");
+  });
+  thread.querySelectorAll("[data-owned-remove]").forEach(button => button.onclick = () => {
+    o.items = o.items.filter(it => it.id !== Number(button.dataset.ownedRemove)); ownedStep("bottles");
+  });
+  const form = $("#owned-fam-form");
+  if (form) {
+    form.querySelectorAll("[data-fam]").forEach(button => button.onclick = () => {
+      const key = button.dataset.fam;
+      if (key === "unsure") { o.families = []; ownedStep("sillage"); return; }
+      const chosen = o.familySelection || [];
+      o.familySelection = chosen.includes(key) ? chosen.filter(k => k !== key) : [...chosen.slice(-1), key]; save(); render();
+    });
+    form.onsubmit = event => { event.preventDefault(); o.families = [...(o.familySelection || [])]; ownedStep("sillage"); };
+  }
+  thread.querySelectorAll("[data-sil]").forEach(button => button.onclick = () => { o.sillage = Number(button.dataset.sil); compareOwnedChat(); });
+  thread.querySelectorAll(".owned-chat-advice img").forEach(img => img.onerror = () => { img.hidden = true; });
 }
 
 // ---------- actions ----------
@@ -393,6 +518,7 @@ function readScale(form, keys) {
 // ---------- wiring for the widgets currently in the thread ----------
 let searchTimer;
 function wire() {
+  if (d.intent === "owned") { wireOwnedChat(); return; }
   thread.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => {
     const f = b.dataset.edit;
     if (f === "fav") { d.fav_done = false; d.fav_q = ""; d.fav_results = []; d.favorite = null; d.fav_skip = ""; }
@@ -464,6 +590,8 @@ function hydrate() {
 
 // ---------- menu and start ----------
 $("#menu").onclick = () => { const p = $("#menu-pop"); p.hidden = !p.hidden; $("#menu").setAttribute("aria-expanded", String(!p.hidden)); };
+$("#wardrobe-link").onclick = enterOwnedChat;
+$("#goal-link").onclick = leaveOwnedChat;
 document.addEventListener("click", e => { if (!e.target.closest("#menu,#menu-pop")) { $("#menu-pop").hidden = true; $("#menu").setAttribute("aria-expanded", "false"); } });
 $("#withdraw").onclick = async () => {
   if (!creds || !session) { clearAll(); render(); return; }
