@@ -14,7 +14,7 @@ function finishOwnedPreferences() {
   const o = d.ownedChat;
   if (o.result?.items?.length) o.privateAdviceSeen = true;
   o.activeTrialTask = "owned_use";
-  if (o.items.length > 1 && config.mode === "pilot") ownedStep("trial-choice");
+  if (o.items.length > 1 && config.mode === "pilot") return offerOwnedTrial();
   else compareOwnedChat();
 }
 function ownedTrialApi(path, method = "GET", body, task = decisionTask()) {
@@ -24,6 +24,12 @@ function ownedTrialApi(path, method = "GET", body, task = decisionTask()) {
 }
 async function offerOwnedTrial() {
   await run(async () => {
+    const t = decisionTrial();
+    if (t?.server && t.server.state !== "complete") {
+      d.ownedChat.stage = "trial-wait";
+      await resumeOwnedTrial();
+      return;
+    }
     const trialConfig = await api(`/owned-study/config?task=${decisionTask()}`);
     if (!trialConfig.available) throw new Error("การเปรียบเทียบเลือกใช้ยังไม่เปิดเก็บจริงค่ะ");
     d.ownedChat[decisionTask() === FOLLOWUP_TASK ? "followupTrialConfig" : "trialConfig"] = trialConfig;
@@ -47,9 +53,10 @@ async function startOwnedTrial() {
     save();
   }
   const t = decisionTrial();
+  t.priorAdviceSeen = decisionTask() === FOLLOWUP_TASK ? !!(o.alternativesSeen || o.alternatives?.items?.length) : !!o.privateAdviceSeen;
   t.server = await api("/owned-study/sessions", {method: "POST", body: JSON.stringify({
     request_id: t.id, client_secret: t.secret, consent: true, eligible: true, task: decisionTask(), context: decisionContext(),
-    prior_advice_seen: decisionTask() === FOLLOWUP_TASK ? !!(o.alternativesSeen || o.alternatives?.items?.length) : !!o.privateAdviceSeen,
+    prior_advice_seen: t.priorAdviceSeen,
   })});
   o.stage = "trial-pre"; save();
 }
@@ -75,17 +82,22 @@ async function resumeOwnedTrial() {
   if (t.server.state === "withdrawn") { await withdrawOwnedTrial(false); }
   else if (t.server.state === "intake") o.stage = "trial-pre";
   else if (t.server.state === "pre_ready") o.stage = "trial-ready";
-  else if (t.server.state === "recommended") o.stage = t.secondShown ? "trial-ratings" : "trial-first";
+  else if (t.server.state === "recommended") o.stage = !t.secondShown ? "trial-first"
+    : t.answers?.relevance_first && t.answers?.relevance_second ? "trial-post" : "trial-ratings";
   else if (t.server.state === "complete") finishDecisionTrial();
   else o.stage = "trial-wait";
   save();
 }
 function buildOwnedTrial(B, C, o) {
   const st = o.stage, t = decisionTrial(), followup = decisionTask() === FOLLOWUP_TASK;
+  const steps = ["ยินยอม", "ก่อนใช้", "สองชุด", "หลังใช้"];
+  const current = ["trial-choice", "trial-consent"].includes(st) ? 0 : st === "trial-pre" ? 1
+    : st === "trial-post" ? 3 : 2;
+  B.push(raw(`<ol class="trial-progress" aria-label="ขั้นตอนรอบทดลอง">${steps.map((label, i) => `<li${i === current ? ' aria-current="step"' : ''}>${i + 1}. ${label}</li>`).join("")}</ol>`));
   if (followup) B.push(senna(`พิจารณาขวดใหม่เพิ่มเติม โดยใช้งบ${esc(config.budget[o.budget ?? 3])}และเกณฑ์กลิ่นเดิมค่ะ`));
   if (st === "trial-choice") {
-    B.push(senna("จะดูคำแนะนำเลย หรือร่วมทดลองเปรียบเทียบสองชุดจากขวดที่มีคะ การร่วมทดลองเป็นทางเลือกค่ะ"));
-    C.chips = [{label: "ดูคำแนะนำเลย", act: compareOwnedChat}, {label: "ร่วมทดลองเปรียบเทียบ", act: offerOwnedTrial}];
+    B.push(senna("ก่อนดูคำแนะนำ ขอความยินยอมและประเมินความมั่นใจสั้น ๆ ค่ะ"));
+    C.chips = [{label: "ประเมินก่อนดูคำแนะนำ", act: offerOwnedTrial}, {label: "ไม่ร่วมทดลอง ใช้คำแนะนำอย่างเดียว", act: compareOwnedChat, soft: true}];
     return {B, C};
   }
   if (st === "trial-consent") {
@@ -94,19 +106,19 @@ function buildOwnedTrial(B, C, o) {
       <li>${followup ? "เปรียบเทียบสองวิธีแนะนำขวดใหม่ โดยตัดขวดที่คุณมีออก ใช้งบและเกณฑ์เดียวกันทั้งสองชุด" : "เปรียบเทียบสองวิธีจัดอันดับจากขวดที่คุณเลือก"} ใช้เวลาประมาณ 3–5 นาที เป็น pilot แยกตามเป้าหมาย</li>
       <li>เก็บรหัสผู้เข้าร่วม รุ่นที่เลือก โอกาส แนวกลิ่น ระดับการกระจาย คะแนนก่อน–หลัง คะแนนสองชุด และเวลา ไม่ขอชื่อหรือเบอร์โทร</li>
       <li>คำนวณจากฐานข้อมูล ไม่ส่งข้อมูลรอบนี้ไปยัง LLM คะแนนสะท้อนการรับรู้ ไม่ได้ยืนยันกลิ่นจริง</li>
-      ${(followup ? o.alternativesSeen || o.alternatives?.items?.length : o.privateAdviceSeen) ? '<li>คุณเคยเห็นคำแนะนำในบทสนทนานี้แล้ว รอบทดลองจะติดป้ายว่าเคยเห็นมาก่อนเพื่อแยกวิเคราะห์</li>' : ''}
+      ${(followup ? o.alternativesSeen || o.alternatives?.items?.length : o.privateAdviceSeen) ? '<li>คุณเคยเห็นคำแนะนำแล้ว คะแนนตั้งต้นรอบใหม่นี้จึงไม่ใช่คะแนนก่อนเห็นคำแนะนำครั้งแรก และจะติดป้ายแยกวิเคราะห์</li>' : ''}
       <li>เข้าร่วมหรือหยุดได้โดยสมัครใจ ถอนตัวและลบผลรอบนี้ได้จากเมนู หากปิดแท็บแล้วติดต่อผู้วิจัยพร้อมรหัสรอบทดลอง</li>
       <li>เก็บข้อมูลถึง ${esc(c.retention_until || config.retention_until)} ติดต่อผ่าน${esc(c.contact || "ช่องทางที่ได้รับลิงก์เชิญ")}</li>
       <li>ผู้ให้บริการเว็บไซต์และรูปภาพอาจมีบันทึกการเชื่อมต่อเพื่อความปลอดภัย</li></ul>
       <label class="check"><input type="checkbox" name="eligible" required><span>ฉันอายุ 18–50 ปี สัญชาติไทย และสนใจน้ำหอม</span></label>
       <label class="check"><input type="checkbox" name="consent" required><span>ฉันอ่านแล้วและยินยอมร่วมทดลอง${followup ? "ขวดใหม่เพิ่มเติม" : "เลือกใช้"}</span></label>
       <button type="submit" class="btn">ยินยอมร่วมทดลอง${followup ? "ขวดใหม่เพิ่มเติม" : "เลือกใช้"}</button></form>`));
-    C.chips = [{label: "ไม่ร่วมทดลอง ดูคำแนะนำเลย", act: followup ? fetchOwnedAlternatives : compareOwnedChat, soft: true}];
+    C.chips = [{label: "ไม่ร่วมทดลอง ใช้คำแนะนำอย่างเดียว", act: followup ? fetchOwnedAlternatives : compareOwnedChat, soft: true}];
     return {B, C};
   }
   const questions = decisionConfig().confidence;
   if (st === "trial-pre") {
-    B.push(checkin("owned-pre-form", "ก่อนดูคำแนะนำ", followup ? "เมื่อพิจารณาขวดใหม่เพิ่มเติม คุณรู้สึกอย่างไร" : "เมื่อเลือกใช้ขวดที่มี คุณรู้สึกอย่างไร", questions.map((q, i) => [`owned_pre${i}`, q]), t.preAnswers, "ดูคำแนะนำสองชุด"));
+    B.push(checkin("owned-pre-form", t.priorAdviceSeen ? "คะแนนตั้งต้นรอบใหม่ (เคยเห็นคำแนะนำแล้ว)" : "ก่อนดูคำแนะนำ", followup ? "เมื่อพิจารณาขวดใหม่เพิ่มเติม คุณรู้สึกอย่างไร" : "เมื่อเลือกใช้ขวดที่มี คุณรู้สึกอย่างไร", questions.map((q, i) => [`owned_pre${i}`, q]), t.preAnswers, "ดูคำแนะนำสองชุด"));
     return {B, C};
   }
   if (["trial-ready", "trial-wait"].includes(st)) {
@@ -188,7 +200,7 @@ function requestOwnedAlternatives() {
 }
 function finishAlternativePreferences() {
   const o = d.ownedChat; o.activeTrialTask = FOLLOWUP_TASK;
-  if (config.mode === "pilot") { o.stage = "alternatives-choice"; lastError = ""; save(); render(); }
+  if (config.mode === "pilot") return offerOwnedTrial();
   else fetchOwnedAlternatives();
 }
 function fetchOwnedAlternatives() {
@@ -209,8 +221,8 @@ function buildOwnedAlternatives(B, C, o) {
     return {B, C};
   }
   if (o.stage === "alternatives-choice") {
-    B.push(senna('<div id="alternatives-answer">อยากดูคำแนะนำขวดใหม่เลย หรือร่วมทดลองเปรียบเทียบสองชุดคะ ไม่บังคับร่วมทดลองค่ะ</div>'));
-    C.chips = [{label: "ดูขวดเพิ่มเติมเลย", act: fetchOwnedAlternatives}, {label: "ร่วมเปรียบเทียบขวดใหม่", act: offerOwnedTrial},
+    B.push(senna('<div id="alternatives-answer">ก่อนดูขวดใหม่ ขอความยินยอมและประเมินความมั่นใจสำหรับขวดใหม่ค่ะ</div>'));
+    C.chips = [{label: "ประเมินก่อนดูขวดใหม่", act: offerOwnedTrial}, {label: "ไม่ร่วมทดลอง ใช้คำแนะนำอย่างเดียว", act: fetchOwnedAlternatives, soft: true},
       {label: "เลือกใช้ขวดเดิม", soft: true, act: chooseExistingBottle}];
     return {B, C};
   }
@@ -224,10 +236,13 @@ function buildOwnedAlternatives(B, C, o) {
   if (t?.server?.state === "complete" && t.completedContext === JSON.stringify({...ownedContext(), budget: o.budget ?? null})) {
     for (const set of t.server.evaluated_sets) B.push(shelf(set, `${set.label} · ขวดใหม่ที่ประเมินแล้ว`, compareSets(t.server.evaluated_sets).shared_item_ids));
     B.push(senna(`<p>บันทึกผลทดลองขวดใหม่เพิ่มเติมแล้ว แยกจากการเลือกใช้ขวดเดิมค่ะ</p><p class="receipt followup-receipt">รหัสรอบทดลอง: ${esc(t.id)}</p>`));
-  } else B.push(shelf({items: o.alternatives.items}, "คำแนะนำขวดใหม่เพิ่มเติม"));
+  } else {
+    B.push(senna('<p class="private-advice-notice" role="status">รอบนี้เป็นคำแนะนำอย่างเดียว ยังไม่มีคะแนนก่อน–หลังหรือผลเปรียบเทียบที่ส่งไว้ค่ะ</p>'));
+    B.push(shelf({items: o.alternatives.items}, "คำแนะนำขวดใหม่เพิ่มเติม"));
+  }
   C.chips = [{label: "เลือกใช้ขวดเดิม", act: chooseExistingBottle}, {label: "จบการคุย", act: () => finishOwnedDecision(null)}, {label: "เปลี่ยนงบ", act: () => { o.budgetSet = false; requestOwnedAlternatives(); }},
     {label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}];
-  if (config.mode === "pilot" && t?.server?.state !== "complete") C.chips.push({label: "เริ่มรอบเปรียบเทียบใหม่", act: requestOwnedAlternatives, soft: true});
+  if (config.mode === "pilot" && t?.server?.state !== "complete") C.chips.unshift({label: "ประเมินคำแนะนำสองชุด", act: () => { o.activeTrialTask = FOLLOWUP_TASK; offerOwnedTrial(); }});
   return {B, C};
 }
 function chooseExistingBottle() {

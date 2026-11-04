@@ -307,6 +307,11 @@ function scrollEnd() {
     const msgs = thread.querySelectorAll(".msg.senna"), el = msgs[msgs.length - 1], last = thread.lastElementChild;
     if (!el || !last) return;
     const header = $(".bar").offsetHeight, comp = composer.offsetHeight;
+    const assessment = thread.querySelector("#owned-consent-form,#owned-pre-form,#owned-ratings-form,#owned-post-form");
+    if (d.intent === "owned" && assessment) {
+      window.scrollTo({top: Math.max(0, assessment.getBoundingClientRect().top + scrollY - header - 12), behavior: "auto"});
+      return;
+    }
     const ownedAnchor = $("#alternatives-answer") || $("#owned-answer");
     if (d.intent === "owned" && !d.ownedChat?.stage.startsWith("trial-") && ownedAnchor) {
       const top = ownedAnchor.closest(".msg").getBoundingClientRect().top + scrollY - header - 12;
@@ -342,7 +347,7 @@ function updateBar() {
   $("#goal-link").textContent = session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "กลับไปเลือกเป้าหมาย";
 }
 
-// Owned-use advice has its own local conversation; it never submits study answers.
+// Owned-use has a separate opt-in pilot; private advice does not submit answers.
 async function enterOwnedChat() {
   if (busy) return;
   if (session && session.state !== "complete") {
@@ -372,7 +377,7 @@ function ownedStep(stage) {
 }
 function buildOwnedChat() {
   const o = d.ownedChat, B = [], C = {chips: [], say: null};
-  B.push(senna("มาดูว่าขวดที่คุณมีจะใช้กับโอกาสไหนได้บ้างค่ะ การดูคำแนะนำอย่างเดียวไม่บันทึกเป็นคำตอบวิจัย หากเลือกร่วมทดลองเปรียบเทียบ จะขอความยินยอมแยกก่อนค่ะ"));
+  B.push(senna("มาดูว่าขวดที่คุณมีจะใช้กับโอกาสไหนได้บ้างค่ะ รอบทดลองจะขอความยินยอมและประเมินความมั่นใจก่อน–หลัง คุณเลือกไม่ร่วมทดลองได้ค่ะ"));
   B.push(user("เลือกใช้ขวดที่มี"));
   B.push(senna("จะใช้น้ำหอมไปไหนหรือในโอกาสอะไรคะ"));
   if (o.stage === "scenario") {
@@ -424,12 +429,15 @@ function buildOwnedChat() {
   for (const it of result.items) B.push(widget(`<article class="owned-chat-advice">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(perfumeLabel(it))}" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><h3>${esc(perfumeLabel(it))}</h3><p class="owned-verdict">${esc(it.assessment)}</p><p class="sub">${esc(it.family)} · ${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</p><ul>${it.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>${it.cautions.map(caution => `<p class="owned-caution">${esc(caution)}</p>`).join("")}</div></article>`));
   if (o.trial?.server?.state === "complete" && o.trial.completedContext === JSON.stringify(ownedContext())) {
     B.push(senna(`<p>บันทึกผลทดลองเลือกใช้แล้วค่ะ ไม่นับรวมกับการเลือกซื้อ</p><p class="receipt owned-receipt">รหัสรอบทดลอง: ${esc(o.trial.id)}</p>`));
+  } else if (o.stage === "result") {
+    B.push(senna(`<p class="private-advice-notice" role="status">${o.items.length > 1 ? "รอบนี้เป็นคำแนะนำอย่างเดียว ยังไม่มีคะแนนก่อน–หลังที่ส่งไว้ค่ะ" : "ตอนนี้เลือกไว้หนึ่งขวด จึงประเมินความเหมาะสมให้ได้ แต่ยังเปรียบเทียบการจัดอันดับขวดที่มีสองวิธีไม่ได้ค่ะ"}</p>`));
   }
   B.push(senna("ความชอบจริงอาจต่างจากข้อมูลกลิ่นค่ะ ลองเทียบกับกลิ่นที่คุณเคยดมและบรรยากาศจริงของงานด้วย"));
   const more = buildOwnedAlternatives(B, C, o); if (more) return more;
   C.chips = [{label: "แนะนำขวดอื่นเพิ่มเติม", act: requestOwnedAlternatives}, {label: "เลือกใช้ขวดเดิม", act: chooseExistingBottle},
     {label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}, {label: "เพิ่มหรือเปลี่ยนขวด", act: () => ownedStep("bottles")},
     {label: session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "เปลี่ยนเป้าหมาย", soft: true, act: leaveOwnedChat}];
+  if (config.mode === "pilot" && o.items.length > 1 && o.trial?.server?.state !== "complete") C.chips.unshift({label: "ประเมินคำแนะนำสองชุด", act: () => { o.activeTrialTask = "owned_use"; offerOwnedTrial(); }});
   return {B, C};
 }
 function compareOwnedChat() {
