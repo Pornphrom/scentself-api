@@ -336,6 +336,7 @@ function updateBar() {
   $("#mode-note").textContent = config.mode === "pilot" ? "รอบทดลองระบบ ข้อมูลไม่นับรวมผลวิจัยหลัก" : "รอบเก็บข้อมูลวิจัย";
   $("#withdraw").hidden = !session || d.intent === "owned";
   $("#withdraw-owned").hidden = d.intent !== "owned" || !d.ownedChat?.trial?.secret;
+  $("#withdraw-followup").hidden = d.intent !== "owned" || !d.ownedChat?.followupTrial?.secret;
   $("#wardrobe-link").hidden = d.intent === "owned";
   $("#goal-link").hidden = d.intent !== "owned";
   $("#goal-link").textContent = session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "กลับไปเลือกเป้าหมาย";
@@ -356,11 +357,13 @@ async function enterOwnedChat() {
 }
 async function leaveOwnedChat() {
   if (busy) return;
-  const trial = d.ownedChat?.trial;
-  if (trial?.secret && trial.server?.state !== "complete") {
-    if (!confirm("ออกจากการทดลองเลือกใช้และลบคำตอบรอบนี้หรือไม่")) return;
-    await run(() => withdrawOwnedTrial(false));
-    if (d.ownedChat?.trial?.secret) return;
+  for (const task of ["owned_use", FOLLOWUP_TASK]) {
+    const trial = decisionTrial(task);
+    if (trial?.secret && trial.server?.state !== "complete") {
+      if (!confirm("ออกจากการทดลองเปรียบเทียบและลบคำตอบรอบที่ยังไม่จบหรือไม่")) return;
+      await run(() => withdrawOwnedTrial(false, task));
+      if (decisionTrial(task)?.secret) return;
+    }
   }
   d.intent = session ? "discover" : null; lastError = ""; $("#menu-pop").hidden = true; save(); render();
 }
@@ -409,6 +412,7 @@ function buildOwnedChat() {
     B.push(sillagePicker(o.sillage)); C.chips = [{label: "ยังไม่กำหนด", act: () => { o.sillage = null; finishOwnedPreferences(); }}]; return {B, C};
   }
   B.push(user(o.sillage === null ? "ยังไม่กำหนด" : SILLAGE[o.sillage].b));
+  if (o.stage.startsWith("decision-")) return buildOwnedDecision(B, C, o);
   if (o.stage.startsWith("trial-")) return buildOwnedTrial(B, C, o);
   if (o.stage === "generating") { B.push({kind: "typing", html: typingHTML()}); return {B, C}; }
   const result = o.result, first = result.items[0];
@@ -423,7 +427,6 @@ function buildOwnedChat() {
   }
   B.push(senna("ความชอบจริงอาจต่างจากข้อมูลกลิ่นค่ะ ลองเทียบกับกลิ่นที่คุณเคยดมและบรรยากาศจริงของงานด้วย"));
   const more = buildOwnedAlternatives(B, C, o); if (more) return more;
-  if (o.useExisting) { B.push(user("เลือกใช้ขวดเดิม")); B.push(senna("ได้ค่ะ ข้อควรระวังของขวดเดิมยังคงใช้ประกอบการตัดสินใจ ไม่จำเป็นต้องซื้อใหม่ค่ะ")); }
   C.chips = [{label: "แนะนำขวดอื่นเพิ่มเติม", act: requestOwnedAlternatives}, {label: "เลือกใช้ขวดเดิม", act: chooseExistingBottle},
     {label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}, {label: "เพิ่มหรือเปลี่ยนขวด", act: () => ownedStep("bottles")},
     {label: session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "เปลี่ยนเป้าหมาย", soft: true, act: leaveOwnedChat}];
@@ -435,7 +438,7 @@ function compareOwnedChat() {
     o.stage = "generating"; save(); render();
     try {
       o.result = await api("/wardrobe/compare", {method: "POST", body: JSON.stringify({owned_ids: o.items.map(it => it.id), scenario: o.scenario, families: o.families, sillage: o.sillage})});
-      o.stage = "result"; save();
+      o.privateAdviceSeen = true; o.stage = "result"; save();
     } catch (error) { o.stage = "sillage"; save(); throw error; }
   });
 }
@@ -612,7 +615,8 @@ function hydrate() {
 $("#menu").onclick = () => { const p = $("#menu-pop"); p.hidden = !p.hidden; $("#menu").setAttribute("aria-expanded", String(!p.hidden)); };
 $("#wardrobe-link").onclick = enterOwnedChat;
 $("#goal-link").onclick = leaveOwnedChat;
-$("#withdraw-owned").onclick = () => run(async () => { if (await withdrawOwnedTrial()) $("#menu-pop").hidden = true; });
+$("#withdraw-owned").onclick = () => run(async () => { if (await withdrawOwnedTrial(true, "owned_use")) $("#menu-pop").hidden = true; });
+$("#withdraw-followup").onclick = () => run(async () => { if (await withdrawOwnedTrial(true, FOLLOWUP_TASK)) $("#menu-pop").hidden = true; });
 document.addEventListener("click", e => { if (!e.target.closest("#menu,#menu-pop")) { $("#menu-pop").hidden = true; $("#menu").setAttribute("aria-expanded", "false"); } });
 $("#withdraw").onclick = async () => {
   if (!creds || !session) { clearAll(); render(); return; }

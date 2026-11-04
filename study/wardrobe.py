@@ -90,7 +90,7 @@ def assess_owned(adapter, body, method="A"):
             "items": items, "engine": adapter.engine_version, "catalog_sha256": adapter.catalog_hash}
 
 
-def suggest_alternatives(adapter, body):
+def suggest_alternatives(adapter, body, method="A"):
     engine = adapter.engine
     if any(i not in engine.by_id for i in body.owned_ids):
         raise ValueError("ไม่พบขวดเดิมบางรุ่นในฐานข้อมูล")
@@ -100,7 +100,7 @@ def suggest_alternatives(adapter, body):
                                   sillage=body.sillage, budget=budget, k=len(engine.items))
     items = []
     owned = [engine.items[engine.by_id[i]] for i in body.owned_ids]
-    for raw in result['A']:
+    for raw in result[method]:
         if raw['id'] in body.owned_ids:
             continue
         item = engine.items[engine.by_id[raw['id']]]

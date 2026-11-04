@@ -80,21 +80,26 @@ class Store:
 
     @staticmethod
     def export_rows(rows, task="purchase"):
-        if task not in {"purchase", "owned_use"}:
+        decision_tasks = {'owned_use', 'discovery_after_owned'}
+        if task not in {"purchase", *decision_tasks}:
             raise ValueError("Unknown export task")
         columns = ["participant_id", "pilot", "consent", "q5_usage", "q6_experience", "q21_budget", "scenario", "pre1", "pre2", "pre3", "post1", "post2", "post3", "relevance_A", "relevance_B", "order_AB", "satisfaction", "clarity", "usefulness", "intention", "use_again", "attention_ok", "duration_sec", "lca_class"]
-        if task == "owned_use":
+        if task in decision_tasks:
             columns = ["participant_id", "task", "pilot", "consent", "protocol", "ui_version", "policy_version",
                        "scenario", "owned_count", "pre1", "pre2", "pre3", "post1", "post2", "post3",
-                       "relevance_A", "relevance_B", "order_AB", "overlap_count", "identical_items", "identical_order", "usefulness", "duration_sec"]
+                       "relevance_A", "relevance_B", "order_AB", "overlap_count", "identical_items", "identical_order", "usefulness", "duration_sec", "prior_advice_seen"]
+            if task == 'discovery_after_owned':
+                columns.append('budget')
         stream = io.StringIO(newline="")
         writer = csv.DictWriter(stream, fieldnames=columns)
         writer.writeheader()
         audit = []
         for row in rows:
             data = json.loads(row["payload"])
-            if (data.get("task") == "owned_use") != (task == "owned_use"):
+            if (data.get("task") in decision_tasks) != (task in decision_tasks):
                 raise ValueError("Cannot mix purchase and owned-use responses")
+            if task in decision_tasks and data.get('task') != task:
+                continue
             record = data["analysis_row"]
             writer.writerow({k: record.get(k, "") for k in columns})
             audit.append({"participant_id": row["id"], "started": row["started"], **data})

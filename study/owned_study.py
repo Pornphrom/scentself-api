@@ -1,32 +1,49 @@
-"""Opt-in, blinded owned-use pilot. Separate protocol, consent, storage and export."""
+"""Opt-in decision pilots with task-specific consent, measures and exports."""
 from datetime import datetime, timezone
 import json
 import secrets
 import time
+from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response
-from pydantic import Field, field_validator
+from pydantic import Field, StrictBool, field_validator
 
 from .routes import compare_sets
 from .schemas import LIKERT, Payload, Start, Viewed
 from .store import StateConflict, Store
-from .wardrobe import OWNED_POLICY, OwnedComparison, assess_owned
+from .wardrobe import OWNED_POLICY, Alternatives, OwnedComparison, assess_owned, suggest_alternatives
 
 PROTOCOL = "owned-use-ab-pilot-v1-20261104"
 CONSENT = "owned-use-consent-pilot-v1-20261104"
 CONFIDENCE = ["ฉันมั่นใจว่าจะเลือกขวดที่มีอยู่สำหรับสถานการณ์นี้ได้",
               "ฉันมั่นใจว่าจะอธิบายเหตุผลในการเลือกขวดที่จะใช้ได้",
               "ฉันตัดสินใจได้ว่าจะใช้ขวดใดจากขวดที่มีอยู่"]
+FOLLOWUP = 'discovery_after_owned'
+FOLLOWUP_PROTOCOL = 'after-owned-discovery-ab-pilot-v1-20261104'
+FOLLOWUP_CONSENT = 'after-owned-discovery-consent-pilot-v1-20261104'
+FOLLOWUP_POLICY = 'after-owned-discovery-ab-v1-20261104'
+FOLLOWUP_CONFIDENCE = ['ฉันมั่นใจว่าจะเลือกน้ำหอมขวดใหม่ที่ตรงกับความต้องการครั้งนี้ได้',
+                       'ฉันมั่นใจว่าจะอธิบายเหตุผลในการพิจารณาขวดใหม่ได้',
+                       'ฉันตัดสินใจได้ว่าจะพิจารณาขวดใหม่ใดเป็นตัวเลือกเพิ่มเติม']
+
+
+def task_config(task):
+    if task == FOLLOWUP:
+        return dict(protocol=FOLLOWUP_PROTOCOL, consent_version=FOLLOWUP_CONSENT,
+                    confidence=FOLLOWUP_CONFIDENCE, policy_version=FOLLOWUP_POLICY)
+    return dict(protocol=PROTOCOL, consent_version=CONSENT, confidence=CONFIDENCE, policy_version=OWNED_POLICY)
 
 
 class OwnedStart(Start):
-    context: OwnedComparison
+    task: Literal['owned_use', 'discovery_after_owned'] = 'owned_use'
+    context: Alternatives
+    prior_advice_seen: StrictBool = False
 
     @field_validator('context')
     @classmethod
-    def needs_comparison(cls, value):
-        if len(value.owned_ids) < 2:
+    def needs_comparison(cls, value, info):
+        if info.data.get('task') == 'owned_use' and len(value.owned_ids) < 2:
             raise ValueError('Ranking comparison requires at least two owned bottles')
         return value
 
@@ -76,7 +93,7 @@ def make_owned_study_router(settings, adapter, store=None):
 
     def public(session):
         data = session['data']
-        result = dict(session_id=session['id'], state=session['state'], task='owned_use', pilot=True)
+        result = dict(session_id=session['id'], state=session['state'], task=data.get('task'), pilot=True)
         if session['state'] == 'withdrawn':
             return result
         result.update(context=data['context'], protocol=data['protocol'], pre=data.get('pre'))
@@ -84,29 +101,35 @@ def make_owned_study_router(settings, adapter, store=None):
             result.update(sets=data['sets'], comparison=data['comparison'], viewed=data.get('viewed', {}))
         if session['state'] == 'complete':
             result.update(advice=data['advice'], receipt=session['id'])
+            if data['task'] == FOLLOWUP:
+                result['evaluated_sets'] = data['sets']
         return result
 
     @router.get('/config')
-    def config():
-        return dict(available=settings.mode == 'pilot', protocol=PROTOCOL, consent_version=CONSENT,
-                    confidence=CONFIDENCE, contact=settings.contact, retention_until=settings.retention_until)
+    def config(task: Literal['owned_use', 'discovery_after_owned'] = 'owned_use'):
+        return dict(available=settings.mode == 'pilot', task=task, **task_config(task),
+                    contact=settings.contact, retention_until=settings.retention_until)
 
     @router.post('/sessions')
     def start(body: OwnedStart):
         available()
         if any(i not in adapter.engine.by_id for i in body.context.owned_ids):
             raise HTTPException(422, 'ไม่พบขวดบางรุ่นในฐานข้อมูล')
-        sid, context = str(body.request_id), body.context.model_dump()
-        payload = dict(task='owned_use', pilot=True, consent=True, eligible=True, protocol=PROTOCOL,
-                       consent_version=CONSENT, confidence_items=CONFIDENCE, retention_until=settings.retention_until,
+        sid = str(body.request_id)
+        context = body.context.model_dump(exclude={'budget'} if body.task == 'owned_use' else set())
+        definition = task_config(body.task)
+        payload = dict(task=body.task, pilot=True, consent=True, eligible=True, protocol=definition['protocol'],
+                       consent_version=definition['consent_version'], confidence_items=definition['confidence'], retention_until=settings.retention_until,
                        ui_version=settings.ui_version, catalog_sha256=adapter.catalog_hash,
-                       engine_version=adapter.engine_version, policy_version=OWNED_POLICY,
+                       engine_version=adapter.engine_version, policy_version=definition['policy_version'],
+                       prior_advice_seen=body.prior_advice_seen,
                        context=context, order_AB=secrets.choice(['AB', 'BA']), started_utc=datetime.now(timezone.utc).isoformat())
         try:
             session = store.create(sid, body.client_secret, payload)
         except PermissionError:
             raise HTTPException(409, 'รหัสคำขอนี้มีอยู่แล้ว') from None
-        if session['data'].get('context') != context or session['state'] == 'withdrawn':
+        if (session['data'].get('context') != context or session['data'].get('task') != body.task
+                or session['state'] == 'withdrawn'):
             raise HTTPException(409, 'รอบนี้ถูกบันทึกด้วยข้อมูลอื่นแล้ว กรุณาเริ่มรหัสใหม่')
         return public(session)
 
@@ -130,9 +153,12 @@ def make_owned_study_router(settings, adapter, store=None):
         session, secret = read(sid, authorization)
         if session['state'] in {'recommended', 'complete'}:
             return public(session)
+        if session['state'] not in {'pre_ready', 'generating'}:
+            raise HTTPException(409, 'กรุณาตอบความรู้สึกก่อนใช้ให้ครบ หรือเริ่มรอบใหม่หากถอนตัวแล้ว')
         data = session['data']
+        definition = task_config(data['task'])
         if (data['catalog_sha256'] != adapter.catalog_hash or data['engine_version'] != adapter.engine_version
-                or data['policy_version'] != OWNED_POLICY or data['protocol'] != PROTOCOL):
+                or data['policy_version'] != definition['policy_version'] or data['protocol'] != definition['protocol']):
             raise HTTPException(409, 'เวอร์ชันระบบเปลี่ยน กรุณาถอนตัวรอบเดิมก่อนเริ่มรอบใหม่')
         if session['state'] == 'generating' and time.time() - session['updated'] > 90:
             session = move(sid, secret, ['generating'], 'pre_ready', {})
@@ -140,11 +166,13 @@ def make_owned_study_router(settings, adapter, store=None):
             raise HTTPException(409, 'กรุณาตอบความรู้สึกก่อนใช้ให้ครบ หรือรอคำขอเดิม')
         move(sid, secret, ['pre_ready'], 'generating', {})
         try:
-            context = OwnedComparison(**data['context'])
-            outputs = {method: assess_owned(adapter, context, method) for method in ['A', 'B']}
-            count = min(3, len(context.owned_ids))
+            followup = data['task'] == FOLLOWUP
+            context = Alternatives(**data['context']) if followup else OwnedComparison(**data['context'])
+            rank = suggest_alternatives if followup else assess_owned
+            outputs = {method: rank(adapter, context, method) for method in ['A', 'B']}
+            count = 3 if followup else min(3, len(context.owned_ids))
             sets = [{'slot': slot, 'label': f'ชุดที่ {i+1}',
-                     'items': [{**it, 'owned_use': True} for it in outputs[method]['items'][:count]]}
+                     'items': [{**it, 'owned_use': not followup} for it in outputs[method]['items'][:count]]}
                     for i, (slot, method) in enumerate(zip(['first', 'second'], data['order_AB']))]
             comparison = compare_sets(sets)
         except Exception:
@@ -176,7 +204,7 @@ def make_owned_study_router(settings, adapter, store=None):
         if session['state'] != 'recommended' or set(data.get('viewed', {})) != {'first', 'second'}:
             raise HTTPException(409, 'กรุณาดูทั้งสองชุดก่อนให้คะแนน')
         ratings = dict(zip(data['order_AB'], [body.relevance_first, body.relevance_second]))
-        row = dict(participant_id=sid, task='owned_use', pilot=1, consent=1, protocol=data['protocol'],
+        row = dict(participant_id=sid, task=data['task'], pilot=1, consent=1, protocol=data['protocol'],
                    ui_version=data['ui_version'], policy_version=data['policy_version'], scenario=data['context']['scenario'],
                    owned_count=len(data['context']['owned_ids']), relevance_A=ratings['A'], relevance_B=ratings['B'],
                    order_AB=data['order_AB'], usefulness=body.usefulness,
@@ -184,20 +212,23 @@ def make_owned_study_router(settings, adapter, store=None):
                    **{f'pre{i+1}': v for i, v in enumerate(data['pre']['scores'])},
                    **{f'post{i+1}': v for i, v in enumerate(body.post)},
                    **{k: int(data['comparison'][k]) for k in ['overlap_count', 'identical_items', 'identical_order']})
+        row['prior_advice_seen'] = int(data['prior_advice_seen']) if 'prior_advice_seen' in data else None
+        if data['task'] == FOLLOWUP:
+            row['budget'] = data['context']['budget']
         return public(move(sid, secret, ['recommended'], 'complete',
                            dict(completion=values, analysis_row=row, completed_utc=datetime.now(timezone.utc).isoformat())))
 
     @router.delete('/sessions/{sid}')
     def withdraw(sid: str, authorization: str | None = Header(default=None)):
-        _, secret = read(sid, authorization)
+        session, secret = read(sid, authorization)
         store.withdraw(sid, secret)
-        return {'state': 'withdrawn', 'task': 'owned_use'}
+        return {'state': 'withdrawn', 'task': session['data'].get('task', 'owned_use')}
 
-    def export(authorization):
+    def export(authorization, task='owned_use'):
         available()
         if not settings.admin_token or not secrets.compare_digest(token(authorization), settings.admin_token):
             raise HTTPException(403, 'ไม่อนุญาตให้ส่งออกข้อมูล')
-        return store.export(task='owned_use')
+        return store.export(task=task)
 
     @router.get('/admin/export.csv')
     def export_csv(authorization: str | None = Header(default=None)):
@@ -207,6 +238,16 @@ def make_owned_study_router(settings, adapter, store=None):
     @router.get('/admin/audit.json')
     def export_audit(authorization: str | None = Header(default=None)):
         _, audit = export(authorization)
+        return Response(json.dumps(audit, ensure_ascii=False), media_type='application/json', headers={'Cache-Control': 'no-store'})
+
+    @router.get('/admin/followup-export.csv')
+    def followup_csv(authorization: str | None = Header(default=None)):
+        text, _ = export(authorization, FOLLOWUP)
+        return Response('\ufeff'+text, media_type='text/csv; charset=utf-8', headers={'Cache-Control': 'no-store'})
+
+    @router.get('/admin/followup-audit.json')
+    def followup_audit(authorization: str | None = Header(default=None)):
+        _, audit = export(authorization, FOLLOWUP)
         return Response(json.dumps(audit, ensure_ascii=False), media_type='application/json', headers={'Cache-Control': 'no-store'})
 
     return router
