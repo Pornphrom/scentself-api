@@ -146,6 +146,7 @@ function bottle(it, shared = []) {
   return `<article class="bottle c-${c}"><div class="pic">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(it.brand + " " + it.name)}" referrerpolicy="no-referrer" loading="lazy">` : '<span class="ph"></span>'}</div>
     <div class="body"><span class="brand">${esc(it.brand)}</span><h4>${esc(it.name)}</h4>
     <div class="facts">${shared.includes(it.id) ? '<span class="fact shared">อยู่ทั้งสองชุด</span>' : ""}<span class="fact dot">${esc(it.family)}</span><span class="fact">${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</span>${owned ? "" : `<span class="fact ${it.over_budget ? "warn" : ""}">${esc(it.price)}</span>`}</div>
+    ${it.family_match_label ? `<p class="family-match ${it.family_match_complete === false ? 'partial' : ''}">${esc(it.family_match_label)}</p>` : ""}
     <div class="why">${owned ? `<p>${esc(it.assessment)}</p>` : "ที่เลือกขวดนี้เพราะ"}<ul>${reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
     ${owned ? (it.cautions || []).map(text => `<p class="owned-caution">${esc(text)}</p>`).join("") : `<button type="button" class="more" aria-expanded="false">ราคาและที่วางขาย</button><div class="more-text" hidden><p>${esc(it.availability || "ยังไม่มีข้อมูลการวางขาย")}</p><p>${esc(it.price_evidence || "ยังไม่มีหลักฐานราคา")}</p><p>ราคาและสินค้าอาจเปลี่ยนแปลง ควรตรวจกับร้านอีกครั้ง</p></div>`}</div></article>`;
 }
@@ -307,7 +308,7 @@ function scrollEnd() {
     const msgs = thread.querySelectorAll(".msg.senna"), el = msgs[msgs.length - 1], last = thread.lastElementChild;
     if (!el || !last) return;
     const header = $(".bar").offsetHeight, comp = composer.offsetHeight;
-    const assessment = thread.querySelector("#owned-consent-form,#owned-pre-form,#owned-ratings-form,#owned-post-form");
+    const assessment = thread.querySelector("#owned-entry-consent-form,#owned-consent-form,#owned-pre-form,#owned-ratings-form,#owned-post-form");
     if (d.intent === "owned" && assessment) {
       window.scrollTo({top: Math.max(0, assessment.getBoundingClientRect().top + scrollY - header - 12), behavior: "auto"});
       return;
@@ -354,11 +355,10 @@ async function enterOwnedChat() {
     if (!confirm("รอบนี้เป็นการทดลองหาขวดใหม่ หากเปลี่ยนเป็นเลือกใช้ขวดที่มี จะถอนตัวและลบคำตอบรอบนี้ ต้องการเปลี่ยนหรือไม่")) return;
     return run(async () => {
       await api(`/study/sessions/${creds.id}`, {method: "DELETE"});
-      clearAll(); d.intent = "owned"; d.ownedChat = {stage: "scenario", items: []}; $("#menu-pop").hidden = true; save();
+      clearAll(); await initializeOwnedChat();
     });
   }
-  d.intent = "owned"; d.ownedChat = {stage: "scenario", items: []}; lastError = ""; shown = 0;
-  $("#menu-pop").hidden = true; save(); render();
+  return run(initializeOwnedChat);
 }
 async function leaveOwnedChat() {
   if (busy) return;
@@ -379,6 +379,7 @@ function buildOwnedChat() {
   const o = d.ownedChat, B = [], C = {chips: [], say: null};
   B.push(senna("มาดูว่าขวดที่คุณมีจะใช้กับโอกาสไหนได้บ้างค่ะ รอบทดลองจะขอความยินยอมและประเมินความมั่นใจก่อน–หลัง คุณเลือกไม่ร่วมทดลองได้ค่ะ"));
   B.push(user("เลือกใช้ขวดที่มี"));
+  if (o.stage === "entry-consent") return buildOwnedEntry(B, C, o);
   B.push(senna("จะใช้น้ำหอมไปไหนหรือในโอกาสอะไรคะ"));
   if (o.stage === "scenario") {
     const choose = (scenario, said = "") => { o.scenario = scenario; o.said = said; ownedStep("bottles"); };
@@ -452,7 +453,7 @@ function compareOwnedChat() {
 }
 function wireOwnedChat() {
   const o = d.ownedChat;
-  if (o.stage.startsWith("trial-")) { wireOwnedTrial(); return; }
+  if (o.stage === "entry-consent" || o.stage.startsWith("trial-")) { wireOwnedTrial(); return; }
   thread.querySelectorAll("[data-owned-add]").forEach(button => button.onclick = () => {
     if (o.items.length >= 10) { lastError = "เลือกได้ไม่เกิน 10 ขวดค่ะ"; render(); return; }
     const item = o.matches.find(it => it.id === Number(button.dataset.ownedAdd));

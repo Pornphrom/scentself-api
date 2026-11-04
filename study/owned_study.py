@@ -1,5 +1,5 @@
 """Opt-in decision pilots with task-specific consent, measures and exports."""
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 import secrets
 import time
@@ -7,12 +7,13 @@ from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response
-from pydantic import Field, StrictBool, field_validator
+from pydantic import AwareDatetime, Field, StrictBool, field_validator
+from uuid import UUID
 
 from .routes import compare_sets
 from .schemas import LIKERT, Payload, Start, Viewed
 from .store import StateConflict, Store
-from .wardrobe import OWNED_POLICY, Alternatives, OwnedComparison, assess_owned, suggest_alternatives
+from .wardrobe import ALTERNATIVES_POLICY, OWNED_POLICY, Alternatives, OwnedComparison, assess_owned, suggest_alternatives
 
 PROTOCOL = "owned-use-ab-pilot-v1-20261104"
 CONSENT = "owned-use-consent-pilot-v1-20261104"
@@ -20,9 +21,10 @@ CONFIDENCE = ["ฉันมั่นใจว่าจะเลือกขว�
               "ฉันมั่นใจว่าจะอธิบายเหตุผลในการเลือกขวดที่จะใช้ได้",
               "ฉันตัดสินใจได้ว่าจะใช้ขวดใดจากขวดที่มีอยู่"]
 FOLLOWUP = 'discovery_after_owned'
-FOLLOWUP_PROTOCOL = 'after-owned-discovery-ab-pilot-v1-20261104'
+FOLLOWUP_PROTOCOL = 'after-owned-discovery-ab-pilot-v2-20261104'
 FOLLOWUP_CONSENT = 'after-owned-discovery-consent-pilot-v1-20261104'
-FOLLOWUP_POLICY = 'after-owned-discovery-ab-v1-20261104'
+FOLLOWUP_POLICY = ALTERNATIVES_POLICY
+ENTRY_CONSENT = 'decision-entry-consent-pilot-v1-20261104'
 FOLLOWUP_CONFIDENCE = ['ฉันมั่นใจว่าจะเลือกน้ำหอมขวดใหม่ที่ตรงกับความต้องการครั้งนี้ได้',
                        'ฉันมั่นใจว่าจะอธิบายเหตุผลในการพิจารณาขวดใหม่ได้',
                        'ฉันตัดสินใจได้ว่าจะพิจารณาขวดใหม่ใดเป็นตัวเลือกเพิ่มเติม']
@@ -35,10 +37,24 @@ def task_config(task):
     return dict(protocol=PROTOCOL, consent_version=CONSENT, confidence=CONFIDENCE, policy_version=OWNED_POLICY)
 
 
+class EntryConsent(Payload):
+    version: Literal['decision-entry-consent-pilot-v1-20261104']
+    entry_id: UUID
+    accepted_at: AwareDatetime
+
+    @field_validator('accepted_at')
+    @classmethod
+    def not_in_future(cls, value):
+        if value > datetime.now(timezone.utc) + timedelta(minutes=5):
+            raise ValueError('Consent time cannot be in the future')
+        return value
+
+
 class OwnedStart(Start):
     task: Literal['owned_use', 'discovery_after_owned'] = 'owned_use'
     context: Alternatives
     prior_advice_seen: StrictBool = False
+    entry_consent: EntryConsent | None = None
 
     @field_validator('context')
     @classmethod
@@ -108,6 +124,7 @@ def make_owned_study_router(settings, adapter, store=None):
     @router.get('/config')
     def config(task: Literal['owned_use', 'discovery_after_owned'] = 'owned_use'):
         return dict(available=settings.mode == 'pilot', task=task, **task_config(task),
+                    entry_consent_version=ENTRY_CONSENT,
                     contact=settings.contact, retention_until=settings.retention_until)
 
     @router.post('/sessions')
@@ -124,6 +141,11 @@ def make_owned_study_router(settings, adapter, store=None):
                        engine_version=adapter.engine_version, policy_version=definition['policy_version'],
                        prior_advice_seen=body.prior_advice_seen,
                        context=context, order_AB=secrets.choice(['AB', 'BA']), started_utc=datetime.now(timezone.utc).isoformat())
+        if body.entry_consent is not None:
+            payload.update(consent_version=ENTRY_CONSENT,
+                           entry_consent=body.entry_consent.model_dump(mode='json'),
+                           consent_scope=['owned_use', FOLLOWUP],
+                           consent_received_utc=datetime.now(timezone.utc).isoformat())
         try:
             session = store.create(sid, body.client_secret, payload)
         except PermissionError:
@@ -213,6 +235,9 @@ def make_owned_study_router(settings, adapter, store=None):
                    **{f'post{i+1}': v for i, v in enumerate(body.post)},
                    **{k: int(data['comparison'][k]) for k in ['overlap_count', 'identical_items', 'identical_order']})
         row['prior_advice_seen'] = int(data['prior_advice_seen']) if 'prior_advice_seen' in data else None
+        row['consent_version'] = data['consent_version']
+        row['consent_entry_id'] = data.get('entry_consent', {}).get('entry_id', '')
+        row['consent_accepted_at_client'] = data.get('entry_consent', {}).get('accepted_at', '')
         if data['task'] == FOLLOWUP:
             row['budget'] = data['context']['budget']
         return public(move(sid, secret, ['recommended'], 'complete',

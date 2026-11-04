@@ -87,7 +87,8 @@ class Store:
         if task in decision_tasks:
             columns = ["participant_id", "task", "pilot", "consent", "protocol", "ui_version", "policy_version",
                        "scenario", "owned_count", "pre1", "pre2", "pre3", "post1", "post2", "post3",
-                       "relevance_A", "relevance_B", "order_AB", "overlap_count", "identical_items", "identical_order", "usefulness", "duration_sec", "prior_advice_seen"]
+                       "relevance_A", "relevance_B", "order_AB", "overlap_count", "identical_items", "identical_order", "usefulness", "duration_sec", "prior_advice_seen",
+                       "consent_version", "consent_entry_id", "consent_accepted_at_client"]
             if task == 'discovery_after_owned':
                 columns.append('budget')
         stream = io.StringIO(newline="")

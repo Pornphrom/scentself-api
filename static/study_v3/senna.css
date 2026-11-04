@@ -74,6 +74,8 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .trial-progress{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;list-style:none;padding:0;margin:16px 0;color:var(--muted);font-size:12px}
 .trial-progress li{border-bottom:2px solid var(--line);padding:8px 0;overflow-wrap:anywhere}
 .trial-progress li[aria-current=step]{color:var(--ink);border-color:var(--juniper);font-weight:700}
+.family-match{font-size:13px;line-height:1.5;color:var(--juniper);overflow-wrap:anywhere}
+.family-match.partial{color:#875a21}
 .item{padding:12px 0;border-top:1px solid #e6d3ac}
 .item:first-of-type{border-top:0}
 .item legend{font-size:15px;font-weight:500;padding:0;margin-bottom:10px}

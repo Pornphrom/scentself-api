@@ -1,6 +1,41 @@
 "use strict";
 
 const FOLLOWUP_TASK = "discovery_after_owned";
+function hasEntryConsent() {
+  const o = d.ownedChat;
+  return !!(o.researchMode === "trial" && o.entryConsent?.entry_id && o.entryConsent.version
+    && o.entryConsent.version === o.trialConfig?.entry_consent_version);
+}
+async function initializeOwnedChat() {
+  const trialConfig = await api("/owned-study/config");
+  d.intent = "owned";
+  d.ownedChat = {stage: "entry-consent", items: [], trialConfig};
+  lastError = ""; shown = 0; $("#menu-pop").hidden = true; save();
+}
+function startOwnedIntake(accepted) {
+  const o = d.ownedChat;
+  o.researchMode = accepted ? "trial" : "private";
+  if (accepted) o.entryConsent = {version: o.trialConfig.entry_consent_version,
+    entry_id: crypto.randomUUID(), accepted_at: new Date().toISOString()};
+  else delete o.entryConsent;
+  o.stage = "scenario"; save(); render();
+}
+function buildOwnedEntry(B, C, o) {
+  const c = o.trialConfig;
+  B.push(widget(`<form id="owned-entry-consent-form" class="consent"><h3>การเข้าร่วม ScentSelf: ช่วยเลือกน้ำหอม</h3><ul>
+    <li>ศึกษาความมั่นใจในการเลือกใช้ขวดที่มี และหากคุณขอดูขวดใหม่เพิ่มเติม จะเปรียบเทียบคำแนะนำขวดใหม่ด้วย ใช้เวลาประมาณ 5–10 นาทีต่อเส้นทาง ไม่จำเป็นต้องซื้อสินค้า</li>
+    <li>เก็บรหัสรอบทดลอง รุ่นที่เลือก โอกาส แนวกลิ่น ระดับการกระจาย งบถ้าระบุ คะแนนก่อน–หลัง คะแนนสองชุด และเวลา ไม่ขอชื่อหรือเบอร์โทร กรุณาไม่พิมพ์ข้อมูลระบุตัวตน</li>
+    <li>คำนวณจากฐานข้อมูล ไม่ส่งข้อมูลสองเส้นทางนี้ไปยัง LLM คะแนนสะท้อนการรับรู้ ไม่ได้ยืนยันกลิ่นจริง รอบนี้เป็น pilot ไม่นับรวมผลวิจัยหลัก</li>
+    <li>การเลือกใช้ขวดเดิมและการหาขวดใหม่เพิ่มเติมใช้คำถามและผลวิเคราะห์แยกกัน หากคุณขอดูขวดใหม่ จะถามคะแนนตั้งต้นของงานนั้นก่อนแสดงผล โดยไม่ขอความยินยอมซ้ำ</li>
+    <li>เข้าร่วมโดยสมัครใจ หยุดได้โดยไม่มีผลเสีย ถอนตัวและลบคำตอบของแต่ละรอบได้จากเมนู หากเปลี่ยนอุปกรณ์ให้ติดต่อผู้วิจัยพร้อมรหัสรอบทดลอง</li>
+    <li>เก็บข้อมูลถึง ${esc(c.retention_until || config.retention_until)} ติดต่อผ่าน${esc(c.contact || "ช่องทางที่ได้รับลิงก์เชิญ")}</li>
+    <li>ผู้ให้บริการเว็บไซต์และรูปภาพอาจมีบันทึกการเชื่อมต่อเพื่อความปลอดภัย การยินยอมขั้นนี้เก็บในเบราว์เซอร์ก่อน และแนบไปยังระบบเมื่อเริ่มตอบแบบประเมินของแต่ละงาน</li></ul>
+    <label class="check"><input type="checkbox" name="eligible" required><span>ฉันอายุ 18–50 ปี สัญชาติไทย และสนใจน้ำหอม</span></label>
+    <label class="check"><input type="checkbox" name="consent" required><span>ฉันอ่านแล้วและยินยอมเข้าร่วมทั้งสองเส้นทางตามที่เลือกใช้งาน</span></label>
+    <button type="submit" class="btn">ยินยอมและเริ่มคุย</button></form>`));
+  C.chips = [{label: "ไม่ร่วมทดลอง ใช้คำแนะนำอย่างเดียว", act: () => startOwnedIntake(false), soft: true}];
+  return {B, C};
+}
 function decisionTask() { return d.ownedChat.activeTrialTask || "owned_use"; }
 function decisionTrial(task = decisionTask()) { return d.ownedChat[task === FOLLOWUP_TASK ? "followupTrial" : "trial"]; }
 function decisionConfig() { return d.ownedChat[decisionTask() === FOLLOWUP_TASK ? "followupTrialConfig" : "trialConfig"]; }
@@ -14,7 +49,7 @@ function finishOwnedPreferences() {
   const o = d.ownedChat;
   if (o.result?.items?.length) o.privateAdviceSeen = true;
   o.activeTrialTask = "owned_use";
-  if (o.items.length > 1 && config.mode === "pilot") return offerOwnedTrial();
+  if (o.items.length > 1 && config.mode === "pilot" && o.researchMode !== "private") return offerOwnedTrial();
   else compareOwnedChat();
 }
 function ownedTrialApi(path, method = "GET", body, task = decisionTask()) {
@@ -33,6 +68,7 @@ async function offerOwnedTrial() {
     const trialConfig = await api(`/owned-study/config?task=${decisionTask()}`);
     if (!trialConfig.available) throw new Error("การเปรียบเทียบเลือกใช้ยังไม่เปิดเก็บจริงค่ะ");
     d.ownedChat[decisionTask() === FOLLOWUP_TASK ? "followupTrialConfig" : "trialConfig"] = trialConfig;
+    if (hasEntryConsent()) { await startOwnedTrial(); return; }
     d.ownedChat.stage = "trial-consent"; lastError = ""; save(); render();
   });
 }
@@ -57,7 +93,9 @@ async function startOwnedTrial() {
   t.server = await api("/owned-study/sessions", {method: "POST", body: JSON.stringify({
     request_id: t.id, client_secret: t.secret, consent: true, eligible: true, task: decisionTask(), context: decisionContext(),
     prior_advice_seen: t.priorAdviceSeen,
+    ...(hasEntryConsent() ? {entry_consent: o.entryConsent} : {}),
   })});
+  o.researchMode = "trial";
   o.stage = "trial-pre"; save();
 }
 async function withdrawOwnedTrial(ask = true, task = decisionTask()) {
@@ -153,6 +191,8 @@ async function markOwnedViewed(slot) {
 }
 function wireOwnedTrial() {
   const o = d.ownedChat, t = decisionTrial();
+  const entry = $("#owned-entry-consent-form");
+  if (entry) entry.onsubmit = event => { event.preventDefault(); if (entry.reportValidity()) startOwnedIntake(true); };
   const consent = $("#owned-consent-form");
   if (consent) consent.onsubmit = event => { event.preventDefault(); if (consent.reportValidity()) run(startOwnedTrial); };
   const pre = $("#owned-pre-form");
@@ -200,7 +240,7 @@ function requestOwnedAlternatives() {
 }
 function finishAlternativePreferences() {
   const o = d.ownedChat; o.activeTrialTask = FOLLOWUP_TASK;
-  if (config.mode === "pilot") return offerOwnedTrial();
+  if (config.mode === "pilot" && o.researchMode !== "private") return offerOwnedTrial();
   else fetchOwnedAlternatives();
 }
 function fetchOwnedAlternatives() {

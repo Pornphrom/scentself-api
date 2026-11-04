@@ -10,6 +10,8 @@ from .schemas import FAMILIES, SCENARIOS, Payload
 
 SCENARIO_WEIGHT = 0.15  # Prototype utility only, not a fitted/validated research weight.
 OWNED_POLICY = "owned-prototype-v1.2-ab-20261104"
+ALTERNATIVES_POLICY = "after-owned-discovery-ab-v2-family-gate-20261104"
+PROFILE_SUPPORT = 0.15  # Same profile-share cutoff already used for two-family explanations.
 
 
 def owned_scores(engine, families, sillage, scenario, method="A"):
@@ -90,6 +92,19 @@ def assess_owned(adapter, body, method="A"):
             "items": items, "engine": adapter.engine_version, "catalog_sha256": adapter.catalog_hash}
 
 
+def alternative_family_match(engine, item, requested):
+    if not requested:
+        return 0, []
+    index = engine.by_id[item['id']]
+    matched = [family for family in requested
+               if item['family'] == family or engine.P[index, engine.fams.index(family)] >= PROFILE_SUPPORT]
+    if len(matched) == len(requested):
+        return (0 if item['family'] in requested else 1), matched
+    if item['family'] in requested:
+        return 2, matched
+    return None, matched
+
+
 def suggest_alternatives(adapter, body, method="A"):
     engine = adapter.engine
     if any(i not in engine.by_id for i in body.owned_ids):
@@ -100,10 +115,18 @@ def suggest_alternatives(adapter, body, method="A"):
                                   sillage=body.sillage, budget=budget, k=len(engine.items))
     items = []
     owned = [engine.items[engine.by_id[i]] for i in body.owned_ids]
-    for raw in result[method]:
+    requested = [FAMILIES[f] for f in body.families]
+    candidates = []
+    for rank, raw in enumerate(result[method]):
         if raw['id'] in body.owned_ids:
             continue
         item = engine.items[engine.by_id[raw['id']]]
+        tier, matched = alternative_family_match(engine, item, requested)
+        if tier is not None:
+            candidates.append((tier, rank, raw, item, matched))
+    # Both methods share these eligibility tiers; retain their own ranking within each tier.
+    candidates.sort(key=lambda candidate: candidate[:2])
+    for tier, _, raw, item, matched in candidates[:3]:
         differences = []
         if (body.sillage is not None and item['sillage_source'] == 'vote' and item['sillage'] == body.sillage
                 and all(it['sillage_source'] == 'vote' and it['sillage'] != body.sillage for it in owned)):
@@ -115,6 +138,15 @@ def suggest_alternatives(adapter, body, method="A"):
             differences.append("เป็นตัวเลือกนอกขวดที่มี ยังไม่ได้ยืนยันว่าตรงกว่าขวดเดิมทุกด้าน")
         reasons = [r.replace('มีส่วนผสมของทั้ง', 'มีลักษณะกลิ่นของทั้ง', 1) for r in raw['reasons']
                    if not r.startswith('กลิ่นระดับปานกลาง:') and r != 'หาซื้อได้ที่ Central' and not r.startswith('อยู่ในงบ')]
+        match_label = ''
+        if requested:
+            match_label = ('ตรงสองแนวที่ขอ: ' if len(requested) == len(matched) == 2 else
+                           'ตรงบางแนวที่ขอ: ' if len(matched) < len(requested) else 'แนวที่ตรงคำขอ: ') + ' / '.join(matched)
+            reasons.insert(0, match_label + ' ตามโปรไฟล์กลิ่นในฐานข้อมูล')
+            if item['family'] not in requested:
+                reasons.insert(1, f"แนวหลักคือ{item['family']} แต่มีโทนรองที่รองรับทั้งสองแนว ไม่ใช่แนวหลักที่ตรงคำขอ")
+            if len(matched) < len(requested):
+                reasons.insert(1, 'เป็นตัวเลือกที่ตรงเพียงบางแนว ยังไม่รองรับครบสองแนวที่เลือก')
         if budget is not None and item['price_tier'] is not None and item['price_tier'] <= budget:
             reasons.append('ระดับราคาที่บันทึกไม่เกินช่วงงบที่เลือก ควรตรวจราคาปัจจุบันอีกครั้ง')
         items.append({"id": item['id'], "brand": item['brand'], "name": item['name'], "family": item['family'],
@@ -123,10 +155,11 @@ def suggest_alternatives(adapter, body, method="A"):
                       "over_budget": budget is not None and item['price_tier'] is not None and item['price_tier'] > budget,
                       "price_evidence": item['price_evidence'], "availability": item['thai_status'],
                       "image_url": adapter.images.get(item['url'], ''), "url": item['url'],
+                      "family_match_label": match_label, "matched_families": matched,
+                      "family_match_complete": len(matched) == len(requested) if requested else None,
                       "reasons": reasons or ['เป็นตัวเลือกจากการจัดอันดับข้อมูลกลิ่นในฐานข้อมูล'], "differences": differences})
-        if len(items) == 3:
-            break
     return {"mode": "owned_to_discovery", "research_data_saved": False,
+            "policy_version": ALTERNATIVES_POLICY,
             "context": body.model_dump(), "items": items}
 
 
