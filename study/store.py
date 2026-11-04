@@ -73,20 +73,28 @@ class Store:
             db.execute("UPDATE sessions SET payload=?,updated=? WHERE id=?", (json.dumps(data, ensure_ascii=False), time.time(), session_id))
         return self.get(session_id, secret)
 
-    def export(self):
+    def export(self, task="purchase"):
         with self.connect() as db:
             rows = db.execute("SELECT id,started,payload FROM sessions WHERE state='complete' ORDER BY started").fetchall()
-        return self.export_rows(rows)
+        return self.export_rows(rows, task)
 
     @staticmethod
-    def export_rows(rows):
+    def export_rows(rows, task="purchase"):
+        if task not in {"purchase", "owned_use"}:
+            raise ValueError("Unknown export task")
         columns = ["participant_id", "pilot", "consent", "q5_usage", "q6_experience", "q21_budget", "scenario", "pre1", "pre2", "pre3", "post1", "post2", "post3", "relevance_A", "relevance_B", "order_AB", "satisfaction", "clarity", "usefulness", "intention", "use_again", "attention_ok", "duration_sec", "lca_class"]
+        if task == "owned_use":
+            columns = ["participant_id", "task", "pilot", "consent", "protocol", "ui_version", "policy_version",
+                       "scenario", "owned_count", "pre1", "pre2", "pre3", "post1", "post2", "post3",
+                       "relevance_A", "relevance_B", "order_AB", "overlap_count", "identical_items", "identical_order", "usefulness", "duration_sec"]
         stream = io.StringIO(newline="")
         writer = csv.DictWriter(stream, fieldnames=columns)
         writer.writeheader()
         audit = []
         for row in rows:
             data = json.loads(row["payload"])
+            if (data.get("task") == "owned_use") != (task == "owned_use"):
+                raise ValueError("Cannot mix purchase and owned-use responses")
             record = data["analysis_row"]
             writer.writerow({k: record.get(k, "") for k in columns})
             audit.append({"participant_id": row["id"], "started": row["started"], **data})

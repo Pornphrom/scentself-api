@@ -154,7 +154,7 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .fact.shared{background:#e7f0f6;border-color:#b9cfde;color:#31596b}
 .menu-pop a{display:block;color:var(--juniper);font-size:14px;padding:8px 0;text-decoration:none}
 .menu-pop a[hidden]{display:none}
-.journey[hidden],#wardrobe-link[hidden],#goal-link[hidden]{display:none}
+.journey[hidden],#wardrobe-link[hidden],#goal-link[hidden],#withdraw-owned[hidden]{display:none}
 .menu-pop #wardrobe-link,.menu-pop #goal-link{color:var(--juniper)}
 .owned-chat-list{margin:0;padding:0;list-style:none}
 .owned-chat-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
@@ -166,6 +166,7 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .owned-chat-advice ul{padding-left:18px}
 .owned-verdict{color:var(--juniper);font-weight:500}
 .owned-caution{color:#865429}
+.bottle>.body>.owned-caution{font-size:13px}
 .owned-result .composer{position:static;background:none;padding-top:8px}
 .owned-result .thread{padding-bottom:16px}
 @media(max-width:360px){.owned-chat-advice{grid-template-columns:64px minmax(0,1fr);gap:10px}.owned-chat-advice img{width:64px;height:100px}}

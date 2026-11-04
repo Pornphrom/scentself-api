@@ -15,9 +15,10 @@ load_dotenv()
 from study.config import Settings
 from study.routes import make_router
 from study.wardrobe import make_wardrobe_router
+from study.owned_study import make_owned_study_router
 from study_v3_adapter import EngineAdapterV3
 
-UI_VERSION = "senna-chat-v3-owned-dialogue-20261104"
+UI_VERSION = "senna-chat-v3-owned-ab-followup-20261104"
 STATIC = Path(__file__).resolve().parent / "static" / "study_v3"
 
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
@@ -31,6 +32,7 @@ def create_app(settings=None):
     adapter = EngineAdapterV3()
     app.include_router(make_router(settings, adapter=adapter))
     app.include_router(make_wardrobe_router(adapter))
+    app.include_router(make_owned_study_router(settings, adapter))
     app.mount("/senna/assets", StaticFiles(directory=str(STATIC)), name="senna-v3-assets")
 
     @app.middleware("http")

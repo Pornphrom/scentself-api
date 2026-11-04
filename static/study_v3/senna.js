@@ -29,7 +29,7 @@ const clearAll = () => { try { [KEY, KEY + ":draft"].forEach(k => sessionStorage
 
 async function api(path, opt = {}) {
   const headers = {"Content-Type": "application/json", ...(opt.headers || {})};
-  if (creds) headers.Authorization = `Bearer ${creds.secret}`;
+  if (creds && !headers.Authorization) headers.Authorization = `Bearer ${creds.secret}`;
   const r = await fetch(`/v2${path}`, {...opt, headers, cache: "no-store"});
   if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} const e = new Error(typeof j.detail === "string" ? j.detail : "ส่งข้อมูลไม่สำเร็จ ลองอีกครั้งได้ค่ะ"); e.status = r.status; throw e; }
   return r.json();
@@ -141,12 +141,13 @@ function shelf(set, title, shared = []) {
 function famKeyByThai(label) { return Object.keys(config.families).find(x => config.families[x] === label) || "none"; }
 function bottle(it, shared = []) {
   const c = famKeyByThai(it.family);
+  const owned = it.owned_use === true;
   const reasons = (it.explanation_reason_ids || [0, 1, 2]).map(i => it.reasons[i]).filter(Boolean);
   return `<article class="bottle c-${c}"><div class="pic">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(it.brand + " " + it.name)}" referrerpolicy="no-referrer" loading="lazy">` : '<span class="ph"></span>'}</div>
     <div class="body"><span class="brand">${esc(it.brand)}</span><h4>${esc(it.name)}</h4>
-    <div class="facts">${shared.includes(it.id) ? '<span class="fact shared">อยู่ทั้งสองชุด</span>' : ""}<span class="fact dot">${esc(it.family)}</span><span class="fact">${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</span><span class="fact ${it.over_budget ? "warn" : ""}">${esc(it.price)}</span></div>
-    <div class="why">ที่เลือกขวดนี้เพราะ<ul>${reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
-    <button type="button" class="more" aria-expanded="false">ราคาและที่วางขาย</button><div class="more-text" hidden><p>${esc(it.availability || "ยังไม่มีข้อมูลการวางขาย")}</p><p>${esc(it.price_evidence || "ยังไม่มีหลักฐานราคา")}</p><p>ราคาและสินค้าอาจเปลี่ยนแปลง ควรตรวจกับร้านอีกครั้ง</p></div></div></article>`;
+    <div class="facts">${shared.includes(it.id) ? '<span class="fact shared">อยู่ทั้งสองชุด</span>' : ""}<span class="fact dot">${esc(it.family)}</span><span class="fact">${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</span>${owned ? "" : `<span class="fact ${it.over_budget ? "warn" : ""}">${esc(it.price)}</span>`}</div>
+    <div class="why">${owned ? `<p>${esc(it.assessment)}</p>` : "ที่เลือกขวดนี้เพราะ"}<ul>${reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
+    ${owned ? (it.cautions || []).map(text => `<p class="owned-caution">${esc(text)}</p>`).join("") : `<button type="button" class="more" aria-expanded="false">ราคาและที่วางขาย</button><div class="more-text" hidden><p>${esc(it.availability || "ยังไม่มีข้อมูลการวางขาย")}</p><p>${esc(it.price_evidence || "ยังไม่มีหลักฐานราคา")}</p><p>ราคาและสินค้าอาจเปลี่ยนแปลง ควรตรวจกับร้านอีกครั้ง</p></div>`}</div></article>`;
 }
 
 // ---------- the conversation as a function of state ----------
@@ -306,8 +307,9 @@ function scrollEnd() {
     const msgs = thread.querySelectorAll(".msg.senna"), el = msgs[msgs.length - 1], last = thread.lastElementChild;
     if (!el || !last) return;
     const header = $(".bar").offsetHeight, comp = composer.offsetHeight;
-    if (d.intent === "owned" && d.ownedChat?.stage === "result" && $("#owned-answer")) {
-      const top = $("#owned-answer").closest(".msg").getBoundingClientRect().top + scrollY - header - 12;
+    const ownedAnchor = $("#alternatives-answer") || $("#owned-answer");
+    if (d.intent === "owned" && !d.ownedChat?.stage.startsWith("trial-") && ownedAnchor) {
+      const top = ownedAnchor.closest(".msg").getBoundingClientRect().top + scrollY - header - 12;
       window.scrollTo({top: Math.max(0, top), behavior: "auto"}); return;
     }
     const toQuestion = el.getBoundingClientRect().top + scrollY - header - 12;          // newest question just under the top bar
@@ -329,10 +331,11 @@ function updateBar() {
   const order = ["talk", "look", "feedback"];
   document.querySelectorAll("#journey li").forEach(li => { const i = order.indexOf(li.dataset.step), cur = order.indexOf(step); li.toggleAttribute("aria-current", false); li.classList.toggle("done", step === "end" || i < cur); if (i === cur) li.setAttribute("aria-current", "step"); });
   $("#journey").hidden = d.intent === "owned" || st === "purpose";
-  document.body.classList.toggle("owned-result", d.intent === "owned" && d.ownedChat?.stage === "result");
+  document.body.classList.toggle("owned-result", d.intent === "owned" && (d.ownedChat?.stage === "result" || d.ownedChat?.stage.startsWith("alternatives-")));
   $("#status").textContent = d.intent === "owned" ? "ช่วยเลือกใช้ขวดที่มี" : config.mode === "pilot" ? "ที่ปรึกษาน้ำหอม (รอบทดลอง)" : "ที่ปรึกษาน้ำหอม";
   $("#mode-note").textContent = config.mode === "pilot" ? "รอบทดลองระบบ ข้อมูลไม่นับรวมผลวิจัยหลัก" : "รอบเก็บข้อมูลวิจัย";
-  $("#withdraw").hidden = !session;
+  $("#withdraw").hidden = !session || d.intent === "owned";
+  $("#withdraw-owned").hidden = d.intent !== "owned" || !d.ownedChat?.trial?.secret;
   $("#wardrobe-link").hidden = d.intent === "owned";
   $("#goal-link").hidden = d.intent !== "owned";
   $("#goal-link").textContent = session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "กลับไปเลือกเป้าหมาย";
@@ -351,8 +354,14 @@ async function enterOwnedChat() {
   d.intent = "owned"; d.ownedChat = {stage: "scenario", items: []}; lastError = ""; shown = 0;
   $("#menu-pop").hidden = true; save(); render();
 }
-function leaveOwnedChat() {
+async function leaveOwnedChat() {
   if (busy) return;
+  const trial = d.ownedChat?.trial;
+  if (trial?.secret && trial.server?.state !== "complete") {
+    if (!confirm("ออกจากการทดลองเลือกใช้และลบคำตอบรอบนี้หรือไม่")) return;
+    await run(() => withdrawOwnedTrial(false));
+    if (d.ownedChat?.trial?.secret) return;
+  }
   d.intent = session ? "discover" : null; lastError = ""; $("#menu-pop").hidden = true; save(); render();
 }
 function ownedStep(stage) {
@@ -360,7 +369,7 @@ function ownedStep(stage) {
 }
 function buildOwnedChat() {
   const o = d.ownedChat, B = [], C = {chips: [], say: null};
-  B.push(senna("มาดูว่าขวดที่คุณมีอยู่จะใช้กับโอกาสไหนได้บ้างค่ะ รอบนี้ไม่ใช่แบบทดลองเลือกซื้อ และไม่บันทึกเป็นคำตอบวิจัย"));
+  B.push(senna("มาดูว่าขวดที่คุณมีจะใช้กับโอกาสไหนได้บ้างค่ะ การดูคำแนะนำอย่างเดียวไม่บันทึกเป็นคำตอบวิจัย หากเลือกร่วมทดลองเปรียบเทียบ จะขอความยินยอมแยกก่อนค่ะ"));
   B.push(user("เลือกใช้ขวดที่มี"));
   B.push(senna("จะใช้น้ำหอมไปไหนหรือในโอกาสอะไรคะ"));
   if (o.stage === "scenario") {
@@ -369,7 +378,9 @@ function buildOwnedChat() {
     C.say = {ph: "เช่น Go party หรือไปทำงาน", act: text => {
       const hint = understand(text);
       if (!hint.scenario) { lastError = "ยังไม่แน่ใจว่าเป็นโอกาสไหน เลือกจากด้านล่างได้ค่ะ"; render(); return; }
-      o.familySelection = hint.families; o.sillage = hint.sillage ?? null; choose(hint.scenario, text);
+      o.familySelection = hint.families; o.sillage = hint.sillage ?? null;
+      if (hint.budget !== undefined && /งบ|บาท|budget|thb|฿/i.test(text)) { o.budget = hint.budget; o.budgetSet = true; }
+      choose(hint.scenario, text);
     }};
     return {B, C};
   }
@@ -395,9 +406,10 @@ function buildOwnedChat() {
   B.push(user(o.families.length ? o.families.map(famLabel).join(" / ") : "ให้ดูตามโอกาส"));
   B.push(senna("อยากให้กลิ่นอยู่ใกล้ตัว หรือกระจายถึงคนรอบข้างแค่ไหนคะ"));
   if (o.stage === "sillage") {
-    B.push(sillagePicker(o.sillage)); C.chips = [{label: "ยังไม่กำหนด", act: () => { o.sillage = null; compareOwnedChat(); }}]; return {B, C};
+    B.push(sillagePicker(o.sillage)); C.chips = [{label: "ยังไม่กำหนด", act: () => { o.sillage = null; finishOwnedPreferences(); }}]; return {B, C};
   }
   B.push(user(o.sillage === null ? "ยังไม่กำหนด" : SILLAGE[o.sillage].b));
+  if (o.stage.startsWith("trial-")) return buildOwnedTrial(B, C, o);
   if (o.stage === "generating") { B.push({kind: "typing", html: typingHTML()}); return {B, C}; }
   const result = o.result, first = result.items[0];
   const allStronger = result.items.every(it => it.assessment_code === "stronger_than_requested");
@@ -406,8 +418,14 @@ function buildOwnedChat() {
     : `${perfumeLabel(first)} กับ${scenarioLabel(o.scenario)}:`;
   B.push(senna(`<div id="owned-answer"><p>${esc(summary)}</p><p>${esc(first.assessment)}</p><p>${result.families_from_popularity ? "อ้างอิงแนวที่ผู้ตอบแบบสอบถามมักเลือกในโอกาสนี้" : "เทียบกับแนวกลิ่นที่คุณเลือก"} ไม่ใช่กฎตายตัว และไม่จำเป็นต้องซื้อขวดใหม่ค่ะ</p></div>`));
   for (const it of result.items) B.push(widget(`<article class="owned-chat-advice">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(perfumeLabel(it))}" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><h3>${esc(perfumeLabel(it))}</h3><p class="owned-verdict">${esc(it.assessment)}</p><p class="sub">${esc(it.family)} · ${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</p><ul>${it.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>${it.cautions.map(caution => `<p class="owned-caution">${esc(caution)}</p>`).join("")}</div></article>`));
+  if (o.trial?.server?.state === "complete" && o.trial.completedContext === JSON.stringify(ownedContext())) {
+    B.push(senna(`<p>บันทึกผลทดลองเลือกใช้แล้วค่ะ ไม่นับรวมกับการเลือกซื้อ</p><p class="receipt owned-receipt">รหัสรอบทดลอง: ${esc(o.trial.id)}</p>`));
+  }
   B.push(senna("ความชอบจริงอาจต่างจากข้อมูลกลิ่นค่ะ ลองเทียบกับกลิ่นที่คุณเคยดมและบรรยากาศจริงของงานด้วย"));
-  C.chips = [{label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}, {label: "เพิ่มหรือเปลี่ยนขวด", act: () => ownedStep("bottles")},
+  const more = buildOwnedAlternatives(B, C, o); if (more) return more;
+  if (o.useExisting) { B.push(user("เลือกใช้ขวดเดิม")); B.push(senna("ได้ค่ะ ข้อควรระวังของขวดเดิมยังคงใช้ประกอบการตัดสินใจ ไม่จำเป็นต้องซื้อใหม่ค่ะ")); }
+  C.chips = [{label: "แนะนำขวดอื่นเพิ่มเติม", act: requestOwnedAlternatives}, {label: "เลือกใช้ขวดเดิม", act: chooseExistingBottle},
+    {label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}, {label: "เพิ่มหรือเปลี่ยนขวด", act: () => ownedStep("bottles")},
     {label: session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "เปลี่ยนเป้าหมาย", soft: true, act: leaveOwnedChat}];
   return {B, C};
 }
@@ -423,6 +441,7 @@ function compareOwnedChat() {
 }
 function wireOwnedChat() {
   const o = d.ownedChat;
+  if (o.stage.startsWith("trial-")) { wireOwnedTrial(); return; }
   thread.querySelectorAll("[data-owned-add]").forEach(button => button.onclick = () => {
     if (o.items.length >= 10) { lastError = "เลือกได้ไม่เกิน 10 ขวดค่ะ"; render(); return; }
     const item = o.matches.find(it => it.id === Number(button.dataset.ownedAdd));
@@ -442,8 +461,9 @@ function wireOwnedChat() {
     });
     form.onsubmit = event => { event.preventDefault(); o.families = [...(o.familySelection || [])]; ownedStep("sillage"); };
   }
-  thread.querySelectorAll("[data-sil]").forEach(button => button.onclick = () => { o.sillage = Number(button.dataset.sil); compareOwnedChat(); });
+  thread.querySelectorAll("[data-sil]").forEach(button => button.onclick = () => { o.sillage = Number(button.dataset.sil); finishOwnedPreferences(); });
   thread.querySelectorAll(".owned-chat-advice img").forEach(img => img.onerror = () => { img.hidden = true; });
+  thread.querySelectorAll(".more").forEach(button => button.onclick = () => { button.nextElementSibling.hidden = !button.nextElementSibling.hidden; button.setAttribute("aria-expanded", String(!button.nextElementSibling.hidden)); });
 }
 
 // ---------- actions ----------
@@ -592,6 +612,7 @@ function hydrate() {
 $("#menu").onclick = () => { const p = $("#menu-pop"); p.hidden = !p.hidden; $("#menu").setAttribute("aria-expanded", String(!p.hidden)); };
 $("#wardrobe-link").onclick = enterOwnedChat;
 $("#goal-link").onclick = leaveOwnedChat;
+$("#withdraw-owned").onclick = () => run(async () => { if (await withdrawOwnedTrial()) $("#menu-pop").hidden = true; });
 document.addEventListener("click", e => { if (!e.target.closest("#menu,#menu-pop")) { $("#menu-pop").hidden = true; $("#menu").setAttribute("aria-expanded", "false"); } });
 $("#withdraw").onclick = async () => {
   if (!creds || !session) { clearAll(); render(); return; }
@@ -617,6 +638,7 @@ $("#withdraw").onclick = async () => {
         hydrate();
       } catch (e) { if (e.status === 404) clearAll(); else throw e; }
     }
+    if (d.intent === "owned") await resumeOwnedTrial();
     render();
   } catch (e) {
     thread.innerHTML = `<p class="error" role="alert">ยังเชื่อมต่อ Senna ไม่ได้ ลองโหลดหน้านี้อีกครั้งค่ะ</p>`;

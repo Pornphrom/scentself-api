@@ -23,13 +23,16 @@ def validate_database_url(url):
 
 
 class PostgresStore:
-    def __init__(self, url, mode="pilot"):
+    def __init__(self, url, mode="pilot", task="purchase"):
         validate_database_url(url)
         if mode not in {"pilot", "live"}:
             raise ValueError("Unknown study storage mode")
+        if task not in {"purchase", "owned_use"}:
+            raise ValueError("Unknown study task")
         self._url = url
-        self.table = sql.Identifier(f"scentself_{mode}_sessions")
-        self.budget_table = sql.Identifier(f"scentself_{mode}_provider_attempts")
+        namespace = f"scentself_{mode}" + ("_owned" if task == "owned_use" else "")
+        self.table = sql.Identifier(f"{namespace}_sessions")
+        self.budget_table = sql.Identifier(f"{namespace}_provider_attempts")
         with self.connect() as db:
             db.execute(sql.SQL("""CREATE TABLE IF NOT EXISTS {} (
                 id TEXT PRIMARY KEY, secret_hash TEXT NOT NULL, started DOUBLE PRECISION NOT NULL,
@@ -104,7 +107,7 @@ class PostgresStore:
             if not row:
                 raise ProviderBudgetExceeded("Daily provider attempt limit reached")
 
-    def export(self):
+    def export(self, task="purchase"):
         with self.connect() as db:
             rows = db.execute(sql.SQL("SELECT id,started,payload FROM {} WHERE state='complete' ORDER BY started").format(self.table)).fetchall()
-        return Store.export_rows(rows)
+        return Store.export_rows(rows, task)
