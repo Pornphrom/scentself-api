@@ -130,7 +130,7 @@ def make_router(settings, store=None, adapter=None, explainer=None):
         session, token = read(sid, authorization)
         preferences = body.model_dump()
         if session["state"] in {"recommended", "complete"}:
-            if preferences != session["data"].get("preferences"):
+            if preferences != {"scent_gender": None, **(session["data"].get("preferences") or {})}:   # sessions saved before 6 Nov have no scent_gender
                 raise HTTPException(409, "คำแนะนำถูกบันทึกแล้ว ไม่สามารถเปลี่ยนความต้องการในรอบนี้")
             return public(session)
         if session["state"] == "generating" and time.time() - session["updated"] > 90:

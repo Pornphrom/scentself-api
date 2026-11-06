@@ -55,6 +55,7 @@ class Preferences(Payload):
     styles: list[str] = Field(default_factory=list, max_length=2)
     outfit: str = Field(default="", max_length=300)
     favorite_id: Annotated[int, Field(strict=True, ge=1)] | None = None
+    scent_gender: Literal["women", "men", "any"] | None = None   # 6 Nov 2026: optional marketed-gender preference
 
     @field_validator("families", "styles")
     @classmethod

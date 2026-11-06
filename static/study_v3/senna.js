@@ -48,6 +48,7 @@ const KW = {
   families: {citrus: ["ส้ม", "มะนาว", "ซิตรัส", "สดชื่น", "เปรี้ยว"], aquatic: ["ทะเล", "น้ำ", "มหาสมุทร"], floral: ["ดอกไม้", "กุหลาบ", "มะลิ", "ฟลอรัล"],
              woody: ["ไม้", "วู้ด", "วูดดี้", "ซีดาร์", "แซนดัล"], green: ["ใบไม้", "ชาเขียว", "ใบชา", "หญ้า", "ธรรมชาติ", "เขียว"], gourmand: ["หวาน", "วานิลลา", "ขนม", "คาราเมล", "ช็อกโกแลต"],
              amber: ["อำพัน", "เรซิน", "กำยาน"], spicy: ["เครื่องเทศ", "อบเชย", "พริกไทย", "สไปซี่"], musk: ["สะอาด", "มัสก์", "แป้ง", "สบู่", "ผ้า"]},
+  gender: {women: ["ผู้หญิง", "สาว ๆ", "สาวๆ", "แนวหญิง", "women", "woman", "female", "for her", "feminine"], men: ["ผู้ชาย", "หนุ่ม", "แนวชาย", "men", "man", "male", "for him", "masculine"]},
   sillage: {0: ["เบา", "ไม่ฉุน", "ใกล้ตัว", "อ่อน ๆ", "อ่อนๆ"], 1: ["กลาง ๆ", "กลางๆ", "ปานกลาง"], 2: ["ชัด", "หอมไกล", "ฟุ้ง", "แรง", "เด่น"]},
 };
 function understand(text) {
@@ -73,6 +74,8 @@ function understand(text) {
   else for (const k of [0, 2, 1]) if (out.sillage === undefined && hit(KW.sillage[k])) out.sillage = k;
   const m = t.replace(/,/g, "").match(/(\d{3,6})/);
   if (m) { const n = Number(m[1]); out.budget = n < 1500 ? 0 : n <= 4000 ? 1 : 2; }
+  if (/ยูนิเซ็กซ์|unisex|ได้ทุกเพศ|ไม่จำกัดเพศ/.test(t)) out.gender = "any";
+  else { const w = hit(KW.gender.women), mn = hit(KW.gender.men); if (w !== mn) out.gender = w ? "women" : "men"; }
   return out;
 }
 
@@ -88,7 +91,7 @@ const famLabel = k => config.families[k];
 function canEdit(f) {
   if (busy) return false;
   if (["scenario", "q6", "q5", "budget"].includes(f)) return session?.state === "intake";
-  if (["fav", "families", "sillage"].includes(f)) return session?.state === "pre_ready" && !d.extras_done;
+  if (["fav", "families", "sillage", "gender"].includes(f)) return session?.state === "pre_ready" && !d.extras_done;
   return false;
 }
 function scale(name, question, value) {
@@ -145,13 +148,14 @@ function bottle(it, shared = []) {
   const reasons = (it.explanation_reason_ids || [0, 1, 2]).map(i => it.reasons[i]).filter(Boolean);
   return `<article class="bottle c-${c}"><div class="pic">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(it.brand + " " + it.name)}" referrerpolicy="no-referrer" loading="lazy">` : '<span class="ph"></span>'}</div>
     <div class="body"><span class="brand">${esc(it.brand)}</span><h4>${esc(it.name)}</h4>
-    <div class="facts">${shared.includes(it.id) ? '<span class="fact shared">อยู่ทั้งสองชุด</span>' : ""}<span class="fact dot">${esc(it.family)}</span><span class="fact">${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</span>${owned ? "" : `<span class="fact ${it.over_budget ? "warn" : ""}">${esc(it.price)}</span>`}</div>
+    <div class="facts">${shared.includes(it.id) ? '<span class="fact shared">อยู่ทั้งสองชุด</span>' : ""}<span class="fact dot">${esc(it.family)}</span>${it.gender ? `<span class="fact">${esc(it.gender)}</span>` : ""}<span class="fact">${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</span>${owned ? "" : `<span class="fact ${it.over_budget ? "warn" : ""}">${esc(it.price)}</span>`}</div>
     ${it.family_match_label ? `<p class="family-match ${it.family_match_complete === false ? 'partial' : ''}">${esc(it.family_match_label)}</p>` : ""}
     <div class="why">${owned ? `<p>${esc(it.assessment)}</p>` : "ที่เลือกขวดนี้เพราะ"}<ul>${reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
     ${owned ? (it.cautions || []).map(text => `<p class="owned-caution">${esc(text)}</p>`).join("") : `<button type="button" class="more" aria-expanded="false">ราคาและที่วางขาย</button><div class="more-text" hidden><p>${esc(it.availability || "ยังไม่มีข้อมูลการวางขาย")}</p><p>${esc(it.price_evidence || "ยังไม่มีหลักฐานราคา")}</p><p>ราคาและสินค้าอาจเปลี่ยนแปลง ควรตรวจกับร้านอีกครั้ง</p></div>`}</div></article>`;
 }
 
 // ---------- the conversation as a function of state ----------
+const GENDER = {women: "กลิ่นแนวผู้หญิง", men: "กลิ่นแนวผู้ชาย", any: "ไม่จำกัด (รวมยูนิเซ็กซ์)"};
 function stage() {
   if (d.intent === "owned") return "owned-" + (d.ownedChat?.stage || "scenario");
   if (!session && !d.intent) return "purpose";
@@ -165,6 +169,7 @@ function stage() {
   if (session.state === "pre_ready" && isCollector() && !d.fav_done) return "fav";
   if (session.state === "pre_ready" && !d.fam_done) return "families";
   if (session.state === "pre_ready" && !d.sil_done) return "sillage";
+  if (session.state === "pre_ready" && !d.gen_done) return "gender";
   if (session.state === "pre_ready" || session.state === "generating") return d.extras_done ? "generating" : "extras";
   if (!d.seen2) return "set1";
   if (!d.rel_done) return "relevance";
@@ -204,8 +209,8 @@ function build() {
     C.say = {ph: "เช่น ไปดินเนอร์วันศุกร์ อยากได้กลิ่นหวาน ๆ ไม่ฉุน", act: tellScenario}; return {B, C};
   }
   B.push(user(d.said || scenarioLabel(d.scenario), "scenario"));
-  const heard = d.hint && (d.hint.families?.length || d.hint.not?.length || d.hint.sillage !== undefined || d.hint.budget !== undefined);
-  B.push(senna(`${d.said ? `<p>เข้าใจว่าเป็น${esc(scenarioLabel(d.scenario))}นะคะ</p>` : ""}${heard ? `<p>จดไว้แล้วว่า${[d.hint.families?.length ? "ชอบ" + d.hint.families.map(famLabel).join(" และ ") : "", d.hint.not?.length ? "ไม่เอา" + d.hint.not.map(famLabel).join(" และ ") : "", d.hint.sillage !== undefined ? "อยากได้กลิ่น" + SILLAGE[d.hint.sillage].b : ""].filter(Boolean).join(" ")} เดี๋ยวถามยืนยันอีกทีค่ะ</p>` : ""}<p>ขอรู้จักกันอีกนิดนะคะ คุ้นเคยกับน้ำหอมแค่ไหนคะ</p>`));
+  const heard = d.hint && (d.hint.families?.length || d.hint.not?.length || d.hint.sillage !== undefined || d.hint.budget !== undefined || d.hint.gender);
+  B.push(senna(`${d.said ? `<p>เข้าใจว่าเป็น${esc(scenarioLabel(d.scenario))}นะคะ</p>` : ""}${heard ? `<p>จดไว้แล้วว่า${[d.hint.families?.length ? "ชอบ" + d.hint.families.map(famLabel).join(" และ ") : "", d.hint.not?.length ? "ไม่เอา" + d.hint.not.map(famLabel).join(" และ ") : "", d.hint.sillage !== undefined ? "อยากได้กลิ่น" + SILLAGE[d.hint.sillage].b : "", d.hint.gender ? "ขอ" + GENDER[d.hint.gender] : ""].filter(Boolean).join(" ")} เดี๋ยวถามยืนยันอีกทีค่ะ</p>` : ""}<p>ขอรู้จักกันอีกนิดนะคะ คุ้นเคยกับน้ำหอมแค่ไหนคะ</p>`));
   if (st === "q6") { C.chips = config.experience.map(v => ({label: v, act: () => answer("q6", v)})); return {B, C}; }
   B.push(user(d.q6, "q6"));
   B.push(senna(`ปกติใช้น้ำหอมบ่อยแค่ไหนคะ`));
@@ -246,6 +251,9 @@ function build() {
   B.push(senna(`${d.families.length ? "" : "<p>ไม่เป็นไรค่ะ เดี๋ยวเริ่มจากแนวที่คนนิยมสำหรับโอกาสนี้ให้ก่อน</p>"}<p>อยากให้กลิ่นไปถึงคนรอบตัวแค่ไหนคะ${d.hint?.sillage !== undefined ? ` ที่เล่ามาน่าจะเป็นแบบ${SILLAGE[d.hint.sillage].b}` : ""}</p>`));
   if (st === "sillage") { B.push(sillagePicker(d.hint?.sillage)); C.chips = [{label: "ยังไม่แน่ใจ", act: () => answer("sillage", null), soft: true}]; return {B, C}; }
   B.push(user(d.sillage === null ? "ยังไม่แน่ใจ" : `${SILLAGE[d.sillage].b}: ${SILLAGE[d.sillage].s}`, "sillage"));
+  B.push(senna(`<p>อยากได้น้ำหอมที่วางตลาดเป็นแนวไหนคะ${d.hint?.gender ? ` ที่เล่ามาน่าจะเป็น${GENDER[d.hint.gender]}` : ""}</p><p class="sub">ขวดยูนิเซ็กซ์จะแนะนำได้เสมอ</p>`));
+  if (st === "gender") { C.chips = ["women", "men", "any"].map(k => ({label: GENDER[k], act: () => { d.scent_gender = k; d.gen_done = true; save(); render(); }})); return {B, C}; }
+  B.push(user(GENDER[d.scent_gender] || GENDER.any, "gender"));
   B.push(senna(`<p>เกือบพร้อมแล้วค่ะ</p><p>${isCollector() ? "อยากให้คนอื่นมองคุณแบบไหน หรือจะแต่งตัวแบบไหนไหมคะ" : "มีน้ำหอมที่ชอบอยู่แล้ว หรืออยากให้คนอื่นมองคุณแบบไหนไหมคะ"} ไม่บอกก็ได้</p>`));
   if (st === "extras") { B.push(extrasForm()); C.chips = [{label: "ไม่มีเพิ่ม ไปดูตัวเลือกเลย", act: () => recommend(true)}]; return {B, C}; }
   B.push(user(extrasSummary()));
@@ -333,7 +341,7 @@ function renderComposer(C) {
   const say = $("#say"); if (say) say.onsubmit = e => { e.preventDefault(); const v = $("#say-input").value.trim(); if (v) C.say.act(v); };
 }
 function updateBar() {
-  const st = stage(), step = ["consent", "scenario", "q6", "q5", "budget", "pre", "fav", "families", "sillage", "extras", "generating"].includes(st) ? "talk" : ["set1"].includes(st) ? "look" : st === "done" ? "end" : "feedback";
+  const st = stage(), step = ["consent", "scenario", "q6", "q5", "budget", "pre", "fav", "families", "sillage", "gender", "extras", "generating"].includes(st) ? "talk" : ["set1"].includes(st) ? "look" : st === "done" ? "end" : "feedback";
   const order = ["talk", "look", "feedback"];
   document.querySelectorAll("#journey li").forEach(li => { const i = order.indexOf(li.dataset.step), cur = order.indexOf(step); li.toggleAttribute("aria-current", false); li.classList.toggle("done", step === "end" || i < cur); if (i === cur) li.setAttribute("aria-current", "step"); });
   $("#journey").hidden = d.intent === "owned" || st === "purpose";
@@ -511,7 +519,7 @@ function answer(field, value) {
 function tellScenario(text) {
   const u = understand(text);
   if (!u.scenario) { lastError = "ยังจับไม่ได้ว่าเป็นโอกาสไหน ลองแตะตัวเลือกด้านล่างได้ค่ะ"; render(); return; }
-  lastError = ""; d.said = text; d.scenario = u.scenario; d.hint = {families: u.families, not: u.not, sillage: u.sillage, budget: u.budget}; save(); render();
+  lastError = ""; d.said = text; d.scenario = u.scenario; d.hint = {families: u.families, not: u.not, sillage: u.sillage, budget: u.budget, gender: u.gender}; save(); render();
 }
 function tellFamilies(text) {
   const u = understand(text);
@@ -549,7 +557,7 @@ function recommend(skip) {
   d.extras_done = true; save();
   run(async () => {
     try {
-      session = await api(`/study/sessions/${creds.id}/recommend`, {method: "POST", body: JSON.stringify({families: d.families || [], sillage: d.sillage ?? null, image: d.image || null, styles: d.styles || [], outfit: (d.outfit || "").trim(), favorite_id: d.favorite?.id || null})});
+      session = await api(`/study/sessions/${creds.id}/recommend`, {method: "POST", body: JSON.stringify({families: d.families || [], sillage: d.sillage ?? null, image: d.image || null, styles: d.styles || [], outfit: (d.outfit || "").trim(), favorite_id: d.favorite?.id || null, scent_gender: d.scent_gender || null})});
     } catch (e) { d.extras_done = false; save(); throw e; }
   });
 }
@@ -578,6 +586,7 @@ function wire() {
     if (f === "fav") { d.fav_done = false; d.fav_q = ""; d.fav_results = []; d.favorite = null; d.fav_skip = ""; }
     else if (f === "families") { d.fam_done = false; d.fam_sel = [...(d.families || [])]; }
     else if (f === "sillage") { d.sil_done = false; }
+    else if (f === "gender") { d.gen_done = false; }
     else { delete d[f]; if (f === "scenario") { delete d.said; delete d.hint; } }
     save(); render();
   });
@@ -638,7 +647,7 @@ function wireExtras() {
 function hydrate() {
   const p = session?.pre, q = session?.preferences;
   if (p) { d.scenario ??= p.scenario; d.q5 ??= p.q5_usage; d.q6 ??= p.q6_experience; d.budget ??= p.q21_budget; d.pre ??= {pre1: p.scores[0], pre2: p.scores[1], pre3: p.scores[2]}; }
-  if (q) { d.families ??= q.families; d.fam_done = true; if (d.sillage === undefined) d.sillage = q.sillage; d.sil_done = true; d.extras_done = true; d.fav_done = true; if (q.favorite_id && !d.favorite) d.favorite = {id: q.favorite_id, label: "น้ำหอมที่เลือกไว้"}; d.image ??= q.image; d.styles ??= q.styles; d.outfit ??= q.outfit; }
+  if (q) { d.families ??= q.families; d.fam_done = true; if (d.sillage === undefined) d.sillage = q.sillage; d.sil_done = true; d.extras_done = true; d.fav_done = true; if (d.scent_gender === undefined) d.scent_gender = q.scent_gender ?? null; d.gen_done = true; if (q.favorite_id && !d.favorite) d.favorite = {id: q.favorite_id, label: "น้ำหอมที่เลือกไว้"}; d.image ??= q.image; d.styles ??= q.styles; d.outfit ??= q.outfit; }
   save();
 }
 

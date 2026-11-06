@@ -1,5 +1,6 @@
 # main_v3.py: separate entry point for the Senna chat UI v3 (1 Nov 2026).
-# Uses catalog_v3.2 + engine v2.2 via study_v3_adapter.EngineAdapterV3 (3 Nov 2026; was catalog_v3 + v2.1 on 1 Nov).
+# Uses catalog_v3.3 + engine v2.3 via study_v3_adapter.EngineAdapterV3 (6 Nov 2026: optional scent-gender question;
+# 3 Nov: catalog_v3.2 + v2.2; 1 Nov: catalog_v3 + v2.1).
 # Shares the /v2 study API and storage code; main.py and /study remain separate.
 # Run:  python -m uvicorn main_v3:app --host 127.0.0.1 --port 8766   then open http://127.0.0.1:8766/senna
 import dataclasses
@@ -18,7 +19,7 @@ from study.wardrobe import make_wardrobe_router
 from study.owned_study import make_owned_study_router
 from study_v3_adapter import EngineAdapterV3
 
-UI_VERSION = "senna-chat-v3-owned-advice-20261105"
+UI_VERSION = "senna-chat-v3-scent-gender-20261106"
 STATIC = Path(__file__).resolve().parent / "static" / "study_v3"
 
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
