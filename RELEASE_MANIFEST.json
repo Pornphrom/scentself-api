@@ -6,7 +6,8 @@
     "engine": "v2.3",
     "ui": "senna-chat-v3-scent-gender-20261106",
     "llm": "gemini-3.5-flash-lite",
-    "llm_role": "extractive"
+    "llm_role": "extractive",
+    "llm_selection_schema": "per-card-bounded-v2-20261106"
   },
   "pilot_consent": {
     "version": "pilot-consent-20261103",
@@ -27,7 +28,7 @@
     "study/schemas.py": "1f7b8e653dd3ee44834b15377941555defeaea746c534029644672e21c3ee3d8",
     "study/store.py": "5533dece6600b70c9297d6a58379add6f4b7146d979e6506469e786b9041db18",
     "study/adapter.py": "fa559d02bf9dcd27b2a8258028f6af3a7e35bdb9972ac864bb206d163ba7fa29",
-    "study/explanations.py": "05cd499a418fc543734adf03c7839fa65e02106a8755d1ca190efbecd7304055",
+    "study/explanations.py": "2b2de3c3ebcfe029f8a3438adcb6c1424d20d879c03e201bb2e880ce4be2b85b",
     "study/provider_budget.py": "1354f0077f4532d3c8e17fc4c2a81aba7c4ee43fb1fa65f123d3f7f411648896",
     "engine_v2/__init__.py": "6d25d30409713aa6f774f49d3653084d3dcf15c5dbccaf5a871ec75581fd72ac",
     "engine_v2/engine_v2.py": "debf1b65dde5e2cd6f095e0e4a7ee27652ee42dcccb60c2734f63d54cd64a9b1",
