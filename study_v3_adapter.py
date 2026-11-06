@@ -6,7 +6,8 @@ import hashlib
 import json
 import threading
 
-from engine_v2.engine_v2_3 import ENGINE_VERSION, GENDER_TH, SennaEngineV23
+from engine_v2.engine_v2_3 import GENDER_TH
+from engine_v2.engine_v2_4 import ENGINE_VERSION, SennaEngineV24
 from study.adapter import EngineAdapter
 from study.config import ROOT
 
@@ -16,7 +17,7 @@ IMAGES_V3 = ROOT / "static" / "study_v3" / "images_v3.json"
 
 class EngineAdapterV3(EngineAdapter):
     def __init__(self):
-        self.engine = SennaEngineV23(catalog_path=str(CATALOG_V3))
+        self.engine = SennaEngineV24(catalog_path=str(CATALOG_V3))
         self.engine_version = ENGINE_VERSION
         self.lock = threading.RLock()   # re-entrant: recommend() below holds it around the base recommend()
         self.catalog_hash = hashlib.sha256(CATALOG_V3.read_bytes()).hexdigest()
@@ -26,13 +27,19 @@ class EngineAdapterV3(EngineAdapter):
     def recommend(self, pre, preference):
         with self.lock:
             self.engine.gender_pref = preference.get("scent_gender")
+            self.engine.purchase_family_gate = True
             try:
                 result, cards = super().recommend(pre, preference)
             finally:
                 self.engine.gender_pref = None
-        for card in cards.values():
+                self.engine.purchase_family_gate = False
+        for key, card in cards.items():
             g = self.engine.items[self.engine.by_id[card["id"]]].get("gender")
             card["gender"] = GENDER_TH[g]
+            raw = result[key[0]][int(key[1:])]
+            for field in ['family_match_label', 'family_match_complete', 'matched_families', 'family_match_tier']:
+                if field in raw:
+                    card[field] = raw[field]
         return result, cards
 
     # Accent- and order-insensitive search (catalog_v3 adds names such as "Acqua di Giò", "Bibliothèque", "Chloé"):

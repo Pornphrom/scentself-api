@@ -19,7 +19,7 @@ from study.wardrobe import make_wardrobe_router
 from study.owned_study import make_owned_study_router
 from study_v3_adapter import EngineAdapterV3
 
-UI_VERSION = "senna-chat-v3-scent-gender-20261106"
+UI_VERSION = "senna-chat-v3-family-gate-20261107"
 STATIC = Path(__file__).resolve().parent / "static" / "study_v3"
 
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "

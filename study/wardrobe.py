@@ -6,12 +6,12 @@ import numpy as np
 from pydantic import Field, field_validator
 
 from engine_v2.engine_v2 import SILLAGE_TH, TIER_TH
+from engine_v2.family_eligibility import PROFILE_SUPPORT, family_match
 from .schemas import FAMILIES, SCENARIOS, Payload
 
 SCENARIO_WEIGHT = 0.15  # Prototype utility only, not a fitted/validated research weight.
 OWNED_POLICY = "owned-prototype-v1.2-ab-20261104"
 ALTERNATIVES_POLICY = "after-owned-discovery-ab-v2-family-gate-20261104"
-PROFILE_SUPPORT = 0.15  # Same profile-share cutoff already used for two-family explanations.
 
 
 def owned_scores(engine, families, sillage, scenario, method="A"):
@@ -93,16 +93,7 @@ def assess_owned(adapter, body, method="A"):
 
 
 def alternative_family_match(engine, item, requested):
-    if not requested:
-        return 0, []
-    index = engine.by_id[item['id']]
-    matched = [family for family in requested
-               if item['family'] == family or engine.P[index, engine.fams.index(family)] >= PROFILE_SUPPORT]
-    if len(matched) == len(requested):
-        return (0 if item['family'] in requested else 1), matched
-    if item['family'] in requested:
-        return 2, matched
-    return None, matched
+    return family_match(engine, item, requested)
 
 
 def suggest_alternatives(adapter, body, method="A"):

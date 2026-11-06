@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import Response
+from engine_v2.family_eligibility import NoEligibleFragrances
 
 from .adapter import EngineAdapter
 from .explanations import Explainer
@@ -61,11 +62,13 @@ def make_router(settings, store=None, adapter=None, explainer=None):
             result["pre"] = data.get("pre")
             result["preferences"] = data.get("preferences")
         if "cards" in data and session["state"] != "complete":
-            result["sets"] = [{"slot": slot, "label": f"ชุดที่ {i + 1}", "items": [data["cards"][f"{method}{k}"] for k in range(3)]} for i, (slot, method) in enumerate(zip(["first", "second"], data["order_AB"]))]
+            result["sets"] = [{"slot": slot, "label": f"ชุดที่ {i + 1}", "items": [data["cards"][key] for key in sorted(data["cards"], key=lambda key: int(key[1:])) if key.startswith(method)]} for i, (slot, method) in enumerate(zip(["first", "second"], data["order_AB"]))]
             result["comparison"] = compare_sets(result["sets"])
             result["families_from_popularity"] = data["engine_result"]["request"]["families_from_popularity"]
             result["selected_family_labels"] = data["engine_result"]["request"]["families"]
             result["viewed"] = data.get("viewed", {})
+            result["family_eligibility_policy"] = data["engine_result"]["request"].get("family_eligibility_policy")
+            result["fewer_than_requested"] = data["engine_result"]["request"].get("fewer_than_requested", False)
         return result
 
     @router.get("/health")
@@ -152,7 +155,10 @@ def make_router(settings, store=None, adapter=None, explainer=None):
         try:
             engine_result, cards = adapter.recommend(session["data"]["pre"], preferences)
             explanation_meta = explainer.explain(cards)
-            comparison = compare_sets([{"items": [cards[f"{method}{k}"] for k in range(3)]} for method in session["data"]["order_AB"]])
+            comparison = compare_sets([{"items": [cards[key] for key in sorted(cards, key=lambda key: int(key[1:])) if key.startswith(method)]} for method in session["data"]["order_AB"]])
+        except NoEligibleFragrances as error:
+            move(sid, token, ["generating"], "pre_ready", {})
+            raise HTTPException(422, str(error)) from None
         except Exception:
             try:
                 move(sid, token, ["generating"], "pre_ready", {})

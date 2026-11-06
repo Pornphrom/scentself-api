@@ -3,8 +3,9 @@
   "hosting": "free",
   "versions": {
     "catalog": "catalog_v3.3_gender_20261106",
-    "engine": "v2.3",
-    "ui": "senna-chat-v3-scent-gender-20261106",
+    "engine": "v2.4",
+    "ui": "senna-chat-v3-family-gate-20261107",
+    "family_eligibility_policy": "explicit-family-eligibility-v1-20261107",
     "llm": "gemini-3.5-flash-lite",
     "llm_role": "extractive",
     "llm_selection_schema": "per-card-bounded-v2-20261106"
@@ -20,11 +21,11 @@
     ".env.example": "073ceb6e269f5c7a9c64a21b6f01f6bbc14d334ed772c31c27bed16ceb1bfa01",
     "requirements.txt": "5c02b9eeeddfdd355dba5a99f1d843157134f776c41d9b75d70ae5197da1984c",
     "main_pilot.py": "ac8ef2836b68ced880cbdd237be4d54a04bb57380336707d905ee87d2a1ae3fd",
-    "main_v3.py": "c5d4abb1b0f44c77b6387ecc39f4c05f0b26c3b027d0691cf6077f027827f411",
-    "study_v3_adapter.py": "0092d6b99ea721cff21dc7e43a6afbd4b2945646357ad265cd009d3dab9ef151",
+    "main_v3.py": "689880ab0ae9528c590d992b841d0a3d828ac5e7c239559821c3f0e720008f0c",
+    "study_v3_adapter.py": "bd488d4166a310131d9a350f2a3790c3eb303e70f56f5c0a0d9c9913d4de56ff",
     "study/__init__.py": "fafe36c4e2460906093e32938d1574d1631fb410ca8e7e1ff7e94042ee481952",
     "study/config.py": "8e467f92aeaee8fa5b7c73025df7a9499425a4a427859ea7875a3d10d85c6bf9",
-    "study/routes.py": "e11aa93846ea3db8cec85c8dabe0800b886a7ee3c33ef8490094da96587e9390",
+    "study/routes.py": "ac3d95804aa398a3a3b657f04b5e4c113d6cf1c9305d83ea96083dd98e77cfdf",
     "study/schemas.py": "1f7b8e653dd3ee44834b15377941555defeaea746c534029644672e21c3ee3d8",
     "study/store.py": "5533dece6600b70c9297d6a58379add6f4b7146d979e6506469e786b9041db18",
     "study/adapter.py": "fa559d02bf9dcd27b2a8258028f6af3a7e35bdb9972ac864bb206d163ba7fa29",
@@ -44,13 +45,15 @@
     "requirements-free.txt": "c827a51e5f94403b146cc45b2acebaa433b81284d8945a570a720b9c7b84c6fd",
     "study/postgres_store.py": "30cb7bb376a04b5eb6659d4c6e5b43c77e6cd29d421b308c53d9dcf8c879b9f6",
     "render.yaml": "b5c9bf74fffef02160296053c8a9e51785a036f497c821ea5c897d22c09b944e",
-    "study/wardrobe.py": "2a58414fefe3c77562f617532161d97778f3cb0f06641cfa40d42fc515a82a6e",
+    "study/wardrobe.py": "08da25363d3210b229390d2c9fff58c13a3a344f9d49f13ab81868572fa82397",
     "static/study_v3/wardrobe.html": "0b52aad76d528dcb189e3f0a47d4341e1d4d06540fd5abfc1a7db84df8a16d7f",
     "static/study_v3/wardrobe.js": "b89c997ae207f1b09faf2d21f83e857fd8f2d8deb096f4643c8097c774bae185",
     "static/study_v3/wardrobe.css": "2a1d0844a8dfcfa9db8a514d1140b56411c0da5713acb873a251b6c6fc7ca36b",
     "study/owned_study.py": "5b3247b13df6fcac91b6e4712a1b9010d4325f6754b8a6488dbcc92ef9bcb0ee",
     "static/study_v3/owned_trial.js": "1a21be23f9b0fc1140c951925a8008b59e411aec7d231cac4defe0e9ee0ea698",
     "engine_v2/engine_v2_3.py": "d5e23c478c183a1f390e3f3828f5411a7b630da1f0f2237c229f344ea06ecdaf",
-    "engine_v2/catalog_v3_3.json": "b05bbf8a2eab1474bc72696cdecf448347a19c1051086b724618590bd15f657f"
+    "engine_v2/catalog_v3_3.json": "b05bbf8a2eab1474bc72696cdecf448347a19c1051086b724618590bd15f657f",
+    "engine_v2/engine_v2_4.py": "16f069ec543a95d0c17442e25d24a6f93113affd0991b00fb63992baa7eef2b4",
+    "engine_v2/family_eligibility.py": "64dc8b9a3d8b2421b7cdfeaeab4baff7bac98a5871fca908e6155fc71dff6b15"
   }
 }
