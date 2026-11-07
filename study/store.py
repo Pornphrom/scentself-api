@@ -83,7 +83,7 @@ class Store:
         decision_tasks = {'owned_use', 'discovery_after_owned'}
         if task not in {"purchase", *decision_tasks}:
             raise ValueError("Unknown export task")
-        columns = ["participant_id", "pilot", "consent", "q5_usage", "q6_experience", "q21_budget", "scenario", "pre1", "pre2", "pre3", "post1", "post2", "post3", "relevance_A", "relevance_B", "order_AB", "satisfaction", "clarity", "usefulness", "intention", "use_again", "attention_ok", "duration_sec", "lca_class"]
+        columns = ["participant_id", "pilot", "consent", "q5_usage", "q6_experience", "q21_budget", "scenario", "pre1", "pre2", "pre3", "post1", "post2", "post3", "relevance_A", "relevance_B", "order_AB", "satisfaction", "clarity", "usefulness", "intention", "use_again", "attention_ok", "duration_sec", "lca_class", "q24_problems", "p_start", "p_regret"]
         if task in decision_tasks:
             columns = ["participant_id", "task", "pilot", "consent", "protocol", "ui_version", "policy_version",
                        "scenario", "owned_count", "pre1", "pre2", "pre3", "post1", "post2", "post3",

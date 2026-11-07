@@ -11,6 +11,11 @@ FAMILIES = {"citrus": "ซิตรัส", "aquatic": "แนวน้ำ / ท
 IMAGES = ["สะอาด สดชื่น", "เป็นมืออาชีพ", "เป็นกันเอง", "อบอุ่น อ่อนโยน", "หรูหรา", "มีเอกลักษณ์", "มีเสน่ห์", "ไม่ได้ต้องการสื่อภาพลักษณ์เป็นพิเศษ", "ยังไม่แน่ใจ"]
 STYLES = ["Minimal", "Casual", "Formal", "Romantic", "Streetwear", "Edgy", "Natural", "Sporty"]
 CONFIDENCE = ["ฉันมั่นใจว่าจะเลือกน้ำหอมที่เหมาะกับตัวเองสำหรับสถานการณ์นี้ได้", "ฉันมั่นใจว่าน้ำหอมที่เลือกจะเหมาะกับโอกาสและภาพลักษณ์ที่ต้องการ", "ฉันมั่นใจพอที่จะตัดสินใจซื้อ แม้ไม่ได้ทดลองกลิ่นก่อน"]
+# 7 Nov 2026: survey Q24 wording (same 7 problems + "none"), asked at intake for the pre-registered secondary analysis S3
+PROBLEMS = ["มีหลายกลิ่น แต่เลือกใช้ให้เหมาะกับสถานการณ์ไม่ถูก", "อยากเปลี่ยนกลิ่น แต่ไม่รู้จะเลือกตัวใหม่อย่างไร", "กังวลว่าซื้อแล้วจะไม่ชอบหรือไม่ได้ใช้",
+            "ไม่รู้ว่าควรเริ่มจากกลิ่นแนวใด", "ไม่แน่ใจว่ากลิ่นเข้ากับการแต่งตัวหรือไม่", "อ่านรีวิวหรือคำบรรยายกลิ่นแล้วไม่เข้าใจ",
+            "ไม่แน่ใจว่ากลิ่นเหมาะกับโอกาสหรือภาพลักษณ์ที่ต้องการหรือไม่", "ไม่เคยพบปัญหา"]
+PROBLEM_START, PROBLEM_REGRET, PROBLEM_NONE = PROBLEMS[3], PROBLEMS[2], PROBLEMS[7]
 LIKERT = Annotated[int, Field(strict=True, ge=1, le=5)]
 
 
@@ -38,6 +43,19 @@ class Pre(Payload):
     q21_budget: str
     scenario: Literal["A", "B", "C"]
     scores: list[LIKERT] = Field(min_length=3, max_length=3)
+    # optional in the API so older clients/smoke scripts still work; the v3 UI always asks it (min 1 choice)
+    q24_problems: list[str] | None = Field(default=None, min_length=1, max_length=8)
+
+    @field_validator("q24_problems")
+    @classmethod
+    def problems(cls, value):
+        if value is None:
+            return None
+        if len(set(value)) != len(value) or any(v not in PROBLEMS for v in value):
+            raise ValueError("Unknown or repeated problem option")
+        if PROBLEM_NONE in value and len(value) > 1:
+            raise ValueError("'No problem' cannot be combined with other problems")
+        return [v for v in PROBLEMS if v in value]          # canonical order
 
     @field_validator("q5_usage", "q6_experience", "q21_budget")
     @classmethod

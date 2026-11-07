@@ -18,7 +18,7 @@ class Settings:
     llm_daily_limit: int = 0
     database_url: str = field(default="", repr=False)
     live_confirmed: bool = False
-    protocol: str = "prepost-v1-20261028-pilot-integration-20261031"
+    protocol: str = "prepost-v2-20261107-pilot-integration-20261031"   # 7 Nov 2026: analysis plan v2 (intake Q24, S3); was prepost-v1-20261028-…
     consent_version: str = "pilot-consent-20261031"
     ui_version: str = "advisor-chat-v2-20261031"
 

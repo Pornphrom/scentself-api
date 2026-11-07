@@ -90,7 +90,7 @@ const scenarioLabel = k => (config.scenarios[k] || "").replace(/^[ABC] /, "");
 const famLabel = k => config.families[k];
 function canEdit(f) {
   if (busy) return false;
-  if (["scenario", "q6", "q5", "budget"].includes(f)) return session?.state === "intake";
+  if (["scenario", "q6", "q5", "budget", "q24"].includes(f)) return session?.state === "intake";
   if (["fav", "families", "sillage", "gender"].includes(f)) return session?.state === "pre_ready" && !d.extras_done;
   return false;
 }
@@ -165,6 +165,7 @@ function stage() {
   if (!d.q6) return "q6";
   if (!d.q5) return "q5";
   if (!d.budget) return "budget";
+  if (!d.q24) return "q24";
   if (session.state === "intake") return "pre";
   if (session.state === "pre_ready" && isCollector() && !d.fav_done) return "fav";
   if (session.state === "pre_ready" && !d.fam_done) return "families";
@@ -219,6 +220,13 @@ function build() {
   B.push(senna(d.hint?.budget !== undefined ? `งบต่อขวดประมาณ${esc(config.budget[d.hint.budget])}ใช่ไหมคะ` : `งบต่อขวดประมาณเท่าไหร่คะ`));
   if (st === "budget") { C.chips = config.budget.map(v => ({label: v, act: () => answer("budget", v)})); return {B, C}; }
   B.push(user(d.budget, "budget"));
+  B.push(senna(`<p>เวลาเลือกน้ำหอม เคยเจอปัญหาไหนบ้างคะ</p><p class="sub">เลือกได้หลายข้อ</p>`));
+  if (st === "q24") {
+    const none = config.problems[config.problems.length - 1];
+    B.push(widget(`<form id="q24-form" class="q24">${config.problems.map((p, i) => `<label class="check"><input type="checkbox" name="q24" value="${i}" ${(d.q24_sel || []).includes(p) ? "checked" : ""}><span>${esc(p === none ? "ไม่เคยเจอปัญหาเลย" : p)}</span></label>`).join("")}<div class="row-end"><button class="btn" type="submit">ถัดไป</button></div></form>`));
+    return {B, C};
+  }
+  B.push(user(d.q24.length === 1 && d.q24[0] === config.problems[config.problems.length - 1] ? "ไม่เคยเจอปัญหาเลย" : `เจอ ${d.q24.length} ข้อ: ${d.q24.join(" · ")}`, "q24"));
   B.push(senna(`<p>ก่อนไปดูกลิ่นกัน ขอเช็กความรู้สึกตอนนี้ 3 ข้อค่ะ</p><p>นึกถึงตอนเลือกน้ำหอมไปใช้${esc(scenarioLabel(d.scenario))} ตอบตามจริงได้เลย ไม่มีถูกผิด</p>`));
   if (st === "pre") { B.push(checkin("pre-form", "เช็กความรู้สึก ก่อนคุยเรื่องกลิ่น", "ตอนนี้คุณรู้สึกอย่างไร", config.confidence.map((q, i) => [`pre${i + 1}`, q]), d.pre, "ส่งคำตอบ")); return {B, C}; }
   B.push(user("ตอบเช็กความรู้สึกแล้ว"));
@@ -550,7 +558,7 @@ async function startSession() {
 }
 async function savePre(scores) {
   d.pre = scores; save();
-  session = await api(`/study/sessions/${creds.id}/pre`, {method: "PUT", body: JSON.stringify({q5_usage: d.q5, q6_experience: d.q6, q21_budget: d.budget, scenario: d.scenario, scores: [1, 2, 3].map(i => scores[`pre${i}`])})});
+  session = await api(`/study/sessions/${creds.id}/pre`, {method: "PUT", body: JSON.stringify({q5_usage: d.q5, q6_experience: d.q6, q21_budget: d.budget, scenario: d.scenario, q24_problems: d.q24, scores: [1, 2, 3].map(i => scores[`pre${i}`])})});
 }
 function recommend(skip) {
   if (skip) { d.image = null; d.styles = []; d.outfit = ""; if (!d.fav_done) d.favorite = null; }
@@ -592,6 +600,17 @@ function wire() {
   });
   const consent = $("#consent-form");
   if (consent) consent.onsubmit = e => { e.preventDefault(); if (!consent.reportValidity()) return; run(startSession); };
+  const q24 = $("#q24-form");
+  if (q24) {
+    const none = String(config.problems.length - 1);
+    q24.querySelectorAll("input").forEach(x => x.onchange = () => {            // "never had a problem" is exclusive
+      if (x.checked) q24.querySelectorAll("input").forEach(y => { if (y !== x && (x.value === none) !== (y.value === none) && y.checked) y.checked = false; });
+      d.q24_sel = [...q24.querySelectorAll("input:checked")].map(y => config.problems[Number(y.value)]); save();
+    });
+    q24.onsubmit = e => { e.preventDefault(); const v = [...q24.querySelectorAll("input:checked")].map(y => config.problems[Number(y.value)]);
+      if (!v.length) { lastError = "เลือกอย่างน้อย 1 ข้อ (หรือ \"ไม่เคยเจอปัญหาเลย\") นะคะ"; render(); return; }
+      d.q24 = v; d.q24_sel = v; save(); render(); };
+  }
   const pre = $("#pre-form");
   if (pre) pre.onsubmit = e => { e.preventDefault(); const v = readScale(pre, ["pre1", "pre2", "pre3"]); if (!v) { lastError = "ตอบให้ครบ 3 ข้อก่อนนะคะ"; render(); return; } run(() => savePre(v)); };
   const fam = $("#fam-form");
@@ -646,7 +665,7 @@ function wireExtras() {
 
 function hydrate() {
   const p = session?.pre, q = session?.preferences;
-  if (p) { d.scenario ??= p.scenario; d.q5 ??= p.q5_usage; d.q6 ??= p.q6_experience; d.budget ??= p.q21_budget; d.pre ??= {pre1: p.scores[0], pre2: p.scores[1], pre3: p.scores[2]}; }
+  if (p) { d.scenario ??= p.scenario; d.q5 ??= p.q5_usage; d.q6 ??= p.q6_experience; d.budget ??= p.q21_budget; d.q24 ??= p.q24_problems || []; d.pre ??= {pre1: p.scores[0], pre2: p.scores[1], pre3: p.scores[2]}; }
   if (q) { d.families ??= q.families; d.fam_done = true; if (d.sillage === undefined) d.sillage = q.sillage; d.sil_done = true; d.extras_done = true; d.fav_done = true; if (d.scent_gender === undefined) d.scent_gender = q.scent_gender ?? null; d.gen_done = true; if (q.favorite_id && !d.favorite) d.favorite = {id: q.favorite_id, label: "น้ำหอมที่เลือกไว้"}; d.image ??= q.image; d.styles ??= q.styles; d.outfit ??= q.outfit; }
   save();
 }

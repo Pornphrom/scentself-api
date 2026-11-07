@@ -10,7 +10,7 @@ from engine_v2.family_eligibility import NoEligibleFragrances
 
 from .adapter import EngineAdapter
 from .explanations import Explainer
-from .schemas import BUDGET, CONFIDENCE, EXPERIENCE, FAMILIES, IMAGES, SCENARIOS, STYLES, USAGE, Completion, Pre, Preferences, Start, Viewed
+from .schemas import BUDGET, CONFIDENCE, EXPERIENCE, FAMILIES, IMAGES, PROBLEM_REGRET, PROBLEM_START, PROBLEMS, SCENARIOS, STYLES, USAGE, Completion, Pre, Preferences, Start, Viewed
 from .store import StateConflict, Store
 
 
@@ -53,6 +53,13 @@ def make_router(settings, store=None, adapter=None, explainer=None):
         except StateConflict:
             raise HTTPException(409, "สถานะเปลี่ยนแล้ว กรุณาโหลดข้อมูลอีกครั้ง") from None
 
+    def current_protocol(session):
+        if session['data'].get('protocol') != settings.protocol:
+            raise HTTPException(409, 'เวอร์ชันการทดลองเปลี่ยนแล้ว กรุณาถอนตัวรอบเดิมแล้วเริ่มใหม่')
+
+    q24_required = (settings.protocol.startswith('prepost-v2-20261107')
+                    and settings.ui_version.startswith('senna-chat-v3-q24-problems'))
+
     def public(session):
         data = session["data"]
         result = {"session_id": session["id"], "participant_id": session["id"], "state": session["state"], "pilot": data.get("pilot", True)}
@@ -78,7 +85,8 @@ def make_router(settings, store=None, adapter=None, explainer=None):
     @router.get("/study/config")
     def config():
         return {"mode": settings.mode, "contact": settings.contact, "retention_until": settings.retention_until, "protocol": settings.protocol,
-                "usage": USAGE, "experience": EXPERIENCE, "budget": BUDGET, "scenarios": SCENARIOS,
+                "q24_required": q24_required,
+                "usage": USAGE, "experience": EXPERIENCE, "budget": BUDGET, "scenarios": SCENARIOS, "problems": PROBLEMS,
                 "families": FAMILIES, "images": IMAGES, "styles": STYLES, "confidence": CONFIDENCE,
                 "consent_version": settings.consent_version, "ui_version": settings.ui_version, "catalog_items": len(adapter.engine.items)}
 
@@ -105,6 +113,7 @@ def make_router(settings, store=None, adapter=None, explainer=None):
     @router.post("/study/sessions/{sid}/view")
     def viewed(sid: str, body: Viewed, authorization: str | None = Header(default=None)):
         session, token = read(sid, authorization)
+        current_protocol(session)
         if session["state"] != "recommended":
             raise HTTPException(409, "ยังไม่มีชุดคำแนะนำให้บันทึกการแสดงผล")
         try:
@@ -123,7 +132,10 @@ def make_router(settings, store=None, adapter=None, explainer=None):
     @router.put("/study/sessions/{sid}/pre")
     def pre(sid: str, body: Pre, authorization: str | None = Header(default=None)):
         session, token = read(sid, authorization)
-        values = body.model_dump()
+        current_protocol(session)
+        if q24_required and not body.q24_problems:
+            raise HTTPException(422, 'กรุณาตอบคำถามปัญหาที่เคยเจอก่อนแบบประเมินก่อนใช้')
+        values = body.model_dump(exclude_none=True)          # q24_problems is stored only when asked (7 Nov 2026)
         if session["state"] == "pre_ready" and session["data"].get("pre") == values:
             return public(session)
         return public(move(sid, token, ["intake"], "pre_ready", {"pre": values, "pre_saved_utc": datetime.now(timezone.utc).isoformat()}))
@@ -131,6 +143,7 @@ def make_router(settings, store=None, adapter=None, explainer=None):
     @router.post("/study/sessions/{sid}/recommend")
     def recommend(sid: str, body: Preferences, authorization: str | None = Header(default=None)):
         session, token = read(sid, authorization)
+        current_protocol(session)
         preferences = body.model_dump()
         if session["state"] in {"recommended", "complete"}:
             if preferences != {"scent_gender": None, **(session["data"].get("preferences") or {})}:   # sessions saved before 6 Nov have no scent_gender
@@ -177,6 +190,7 @@ def make_router(settings, store=None, adapter=None, explainer=None):
             if session["data"].get("completion") != answers:
                 raise HTTPException(409, "ส่งแบบประเมินแล้ว ไม่สามารถเขียนทับคำตอบ")
             return public(session)
+        current_protocol(session)
         if session["state"] != "recommended":
             raise HTTPException(409, "กรุณาดูคำแนะนำก่อนส่งแบบประเมินหลังใช้")
         if set(session["data"].get("viewed", {})) != {"first", "second"}:
@@ -189,7 +203,11 @@ def make_router(settings, store=None, adapter=None, explainer=None):
                **{f"post{i + 1}": v for i, v in enumerate(body.post)},
                "relevance_A": ratings["A"], "relevance_B": ratings["B"], "order_AB": data["order_AB"],
                **{k: answers[k] for k in ["satisfaction", "clarity", "usefulness", "intention", "use_again"]},
-               "attention_ok": int(body.attention_answer == 2), "duration_sec": round(max(0, time.time() - session["started"]), 3), "lca_class": None}
+               "attention_ok": int(body.attention_answer == 2), "duration_sec": round(max(0, time.time() - session["started"]), 3), "lca_class": None,
+               # 7 Nov 2026 (plan addendum A1, secondary S3): intake Q24 problems; empty for sessions started before the question existed
+               "q24_problems": "|".join(pre.get("q24_problems") or []),
+               "p_start": int(PROBLEM_START in pre["q24_problems"]) if pre.get("q24_problems") else None,
+               "p_regret": int(PROBLEM_REGRET in pre["q24_problems"]) if pre.get("q24_problems") else None}
         session = move(sid, token, ["recommended"], "complete", {"completion": answers, "analysis_row": row, "completed_utc": datetime.now(timezone.utc).isoformat()})
         return public(session)
 
