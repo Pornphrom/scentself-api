@@ -86,7 +86,7 @@ const widget = (html, cls = "") => ({kind: "widget", html: `<section class="widg
 const raw = html => ({kind: "raw", html});
 const perfumeLabel = i => (i.name.toLowerCase().startsWith(i.brand.toLowerCase()) ? i.name : `${i.brand} ${i.name}`);
 function exactPerfumeName(query, item) {
-  const key = text => text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const key = text => text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
   const name = key(query);
   return !!name && (name === key(item.name) || name === key(perfumeLabel(item)));
 }
