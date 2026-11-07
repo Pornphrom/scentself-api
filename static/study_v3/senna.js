@@ -85,6 +85,9 @@ const user = (text, editField) => ({kind: "user", html: `<div class="msg user"><
 const widget = (html, cls = "") => ({kind: "widget", html: `<section class="widget ${cls}">${html}</section>`});
 const raw = html => ({kind: "raw", html});
 const perfumeLabel = i => (i.name.toLowerCase().startsWith(i.brand.toLowerCase()) ? i.name : `${i.brand} ${i.name}`) + (i.edition ? ` (${i.edition})` : "");
+const favoriteLabel = it => esc(perfumeLabel(it)) + (it.research_eligible === false ? ' <span class="sub">· ยังไม่ใช้เทียบกลิ่น</span>' : "");
+const favoriteChoice = it => ({id: it.id, label: perfumeLabel(it), similarity: it.research_eligible !== false});
+const favoriteReferenceId = () => d.favorite?.similarity === false ? null : d.favorite?.id ?? null;
 function exactPerfumeName(query, item) {
   const key = text => text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
   const name = key(query);
@@ -124,7 +127,7 @@ function extrasForm() {
   const imgs = config.images.filter(v => !v.startsWith("ไม่ได้ต้องการ") && v !== "ยังไม่แน่ใจ");
   return widget(`<div class="extras"><h3>เล่าเพิ่มได้ ไม่บังคับ</h3>
     ${isCollector() ? "" : `<label class="lbl" for="fav-q">น้ำหอมที่ชอบอยู่แล้ว</label><div class="search"><input id="fav-q" type="search" autocomplete="off" placeholder="พิมพ์ชื่อแบรนด์หรือรุ่น" maxlength="100"><div class="results" id="fav-results" hidden></div></div>
-    ${d.favorite ? `<span class="picked">${esc(d.favorite.label)}<button type="button" id="fav-clear" aria-label="เอาออก">×</button></span>` : ""}`}
+    ${d.favorite ? `<span class="picked">${esc(d.favorite.label)}${d.favorite.similarity === false ? ' · ยังไม่ใช้เทียบกลิ่น' : ''}<button type="button" id="fav-clear" aria-label="เอาออก">×</button></span>` : ""}`}
     <span class="lbl">อยากให้คนอื่นมองว่า</span><div class="opt">${imgs.map(v => `<button type="button" class="toggle" data-img="${esc(v)}" aria-pressed="${d.image === v}">${esc(v)}</button>`).join("")}</div>
     <span class="lbl">สไตล์การแต่งตัว (ไม่เกิน 2)</span><div class="opt">${config.styles.map(v => `<button type="button" class="toggle" data-style="${v}" aria-pressed="${(d.styles || []).includes(v)}">${v}</button>`).join("")}</div>
     <label class="lbl" for="outfit">วันนั้นจะแต่งตัวแบบไหน</label><textarea id="outfit" rows="2" maxlength="300" placeholder="เช่น เสื้อเชิ้ตขาว กางเกงสแล็กส์">${esc(d.outfit || "")}</textarea>
@@ -236,13 +239,13 @@ function build() {
   if (st === "pre") { B.push(checkin("pre-form", "เช็กความรู้สึก ก่อนคุยเรื่องกลิ่น", "ตอนนี้คุณรู้สึกอย่างไร", config.confidence.map((q, i) => [`pre${i + 1}`, q]), d.pre, "ส่งคำตอบ")); return {B, C}; }
   B.push(user("ตอบเช็กความรู้สึกแล้ว"));
   if (isCollector()) {
-    B.push(senna(`<p>ขอบคุณค่ะ มีน้ำหอมที่ชอบกลิ่นอยู่แล้ว ตัวไหนคะ</p><p>จะใช้เป็นตัวอ้างอิงเพื่อหาขวดใหม่ที่กลิ่นใกล้เคียงค่ะ</p>`));
+    B.push(senna(`<p>ขอบคุณค่ะ มีน้ำหอมที่ชอบกลิ่นอยู่แล้ว ตัวไหนคะ</p><p>ถ้ามีข้อมูลสำหรับเทียบกลิ่น จะใช้เป็นตัวอ้างอิงให้ค่ะ</p>`));
     if (st === "fav") {
       if (d.fav_q) {
         B.push(user(d.fav_q));
         if (d.fav_results?.length) {
           B.push(senna(d.fav_results.length === 1 ? "ใช่ตัวนี้ไหมคะ" : "เจอรุ่นเหล่านี้ในรายการค่ะ ตัวไหนคะ"));
-          B.push(widget(`<div class="fav-pick">${d.fav_results.map(r => `<button type="button" class="toggle" data-favpick="${r.id}">${esc(perfumeLabel(r))}</button>`).join("")}</div>`));
+          B.push(widget(`<div class="fav-pick">${d.fav_results.map(r => `<button type="button" class="toggle" data-favpick="${r.id}">${favoriteLabel(r)}</button>`).join("")}${d.fav_offset > 0 ? '<button type="button" class="toggle" id="fav-prev">ผลก่อนหน้า</button>' : ''}${d.fav_next != null ? '<button type="button" class="toggle" id="fav-next">ดูผลเพิ่มเติม</button>' : ''}</div>`));
           C.chips = [{label: "ไม่มีรุ่นที่ใช้ในนี้", act: () => favDone(null, "ไม่มีรุ่นที่ใช้ในนี้"), soft: true}];
         } else {
           B.push(senna(`ยังหาไม่เจอในรายการค่ะ ลองพิมพ์ชื่อภาษาอังกฤษ หรือแค่ชื่อแบรนด์ก็ได้`));
@@ -253,7 +256,10 @@ function build() {
       return {B, C};
     }
     B.push(user(d.favorite ? d.favorite.label : (d.fav_skip || "ข้ามไปก่อน"), "fav"));
-    B.push(senna(`${d.favorite ? `<p>จดไว้แล้วค่ะ จะหากลิ่นที่ใกล้เคียงกับ ${esc(d.favorite.label)} ให้ด้วย</p>` : d.fav_q ? "<p>ไม่เป็นไรค่ะ ตัวนั้นยังไม่มีในรายการของ Senna</p>" : ""}<p>แล้วรอบนี้อยากได้กลิ่นแนวไหนคะ${d.hint?.families?.length ? " ที่เล่ามาเลือกไว้ให้แล้ว แก้ได้นะคะ" : ""}</p>`));
+    const favoriteNote = d.favorite?.similarity === false
+      ? `<p>พบ ${esc(d.favorite.label)} แล้วค่ะ แต่ยังใช้เทียบกลิ่นโดยตรงไม่ได้ รอบนี้จะใช้แนวกลิ่นที่คุณเลือกค่ะ</p>`
+      : d.favorite ? `<p>จดไว้แล้วค่ะ จะหากลิ่นที่ใกล้เคียงกับ ${esc(d.favorite.label)} ให้ด้วย</p>` : "";
+    B.push(senna(`${favoriteNote}<p>แล้วรอบนี้อยากได้กลิ่นแนวไหนคะ${d.hint?.families?.length ? " ที่เล่ามาเลือกไว้ให้แล้ว แก้ได้นะคะ" : ""}</p>`));
   } else B.push(senna(`<p>ขอบคุณค่ะ มาเรื่องกลิ่นกันนะคะ</p><p>ชอบกลิ่นแนวไหน${d.hint?.families?.length ? " ที่เล่ามาเลือกไว้ให้แล้ว แก้ได้นะคะ" : ""}</p>`));
   if (st === "families") {
     if (!d.fam_sel) { d.fam_sel = [...(d.hint?.families || [])]; }
@@ -553,20 +559,15 @@ function tellFamilies(text) {
   d.fam_sel = u.families.length ? u.families : (d.fam_sel || []).filter(f => !u.not.includes(f)); save(); render();
 }
 function favDone(item, skipLabel) {
-  d.favorite = item ? {id: item.id, label: perfumeLabel(item)} : null; d.fav_skip = skipLabel || ""; d.fav_done = true; lastError = ""; save(); render();
+  d.favorite = item ? favoriteChoice(item) : null; d.fav_skip = skipLabel || ""; d.fav_done = true; lastError = ""; save(); render();
 }
-async function findFavorite(text) {
-  const words = text.toLowerCase().split(/\s+/).filter(w => w.length >= 2);
-  const queries = [...new Set([text.trim(), ...words])].slice(0, 6);
-  const found = new Map();
+const favoriteSearch = (text, offset = 0) => api(`/wardrobe/search?q=${encodeURIComponent(text)}&offset=${offset}`);
+async function findFavorite(text, offset = 0) {
   await run(async () => {
-    for (const q of queries) { const r = await api(`/search?q=${encodeURIComponent(q)}`); r.items.forEach(i => found.set(i.id, i)); }
+    const result = await favoriteSearch(text, offset);
+    Object.assign(d, {fav_q: text, fav_results: result.items, fav_offset: offset, fav_next: result.next_offset});
+    save();
   });
-  const score = i => words.filter(w => `${i.brand} ${i.name}`.toLowerCase().includes(w)).length;
-  d.fav_q = text; d.fav_results = [...found.values()].sort((a, b) => score(b) - score(a)).slice(0, 8);
-  const exact = d.fav_results.filter(i => score(i) === words.length && words.length > 1);
-  if (exact.length === 1) d.fav_results = exact;
-  save(); render();
 }
 async function startSession() {
   notice = "";
@@ -582,7 +583,7 @@ function recommend(skip) {
   d.extras_done = true; save();
   run(async () => {
     try {
-      session = await api(`/study/sessions/${creds.id}/recommend`, {method: "POST", body: JSON.stringify({families: d.families || [], sillage: d.sillage ?? null, image: d.image || null, styles: d.styles || [], outfit: (d.outfit || "").trim(), favorite_id: d.favorite?.id || null, scent_gender: d.scent_gender || null})});
+      session = await api(`/study/sessions/${creds.id}/recommend`, {method: "POST", body: JSON.stringify({families: d.families || [], sillage: d.sillage ?? null, image: d.image || null, styles: d.styles || [], outfit: (d.outfit || "").trim(), favorite_id: favoriteReferenceId(), scent_gender: d.scent_gender || null})});
     } catch (e) { d.extras_done = false; save(); throw e; }
   });
 }
@@ -608,7 +609,7 @@ function wire() {
   if (d.intent === "owned") { wireOwnedChat(); return; }
   thread.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => {
     const f = b.dataset.edit;
-    if (f === "fav") { d.fav_done = false; d.fav_q = ""; d.fav_results = []; d.favorite = null; d.fav_skip = ""; }
+    if (f === "fav") { d.fav_done = false; d.fav_q = ""; d.fav_results = []; d.favorite = null; d.fav_skip = ""; d.fav_offset = 0; d.fav_next = null; }
     else if (f === "families") { d.fam_done = false; d.fam_sel = [...(d.families || [])]; }
     else if (f === "sillage") { d.sil_done = false; }
     else if (f === "gender") { d.gen_done = false; }
@@ -644,6 +645,9 @@ function wire() {
     fam.onsubmit = e => { e.preventDefault(); if (!(d.fam_sel || []).length) return; d.families = [...d.fam_sel]; d.fam_done = true; save(); render(); };
   }
   thread.querySelectorAll("[data-favpick]").forEach(b => b.onclick = () => favDone(d.fav_results.find(r => r.id === Number(b.dataset.favpick))));
+  const next = $("#fav-next"), previous = $("#fav-prev");
+  if (next) next.onclick = () => findFavorite(d.fav_q, d.fav_next);
+  if (previous) previous.onclick = () => findFavorite(d.fav_q, Math.max(0, d.fav_offset - 10));
   thread.querySelectorAll("[data-sil]").forEach(b => b.onclick = () => answer("sillage", Number(b.dataset.sil)));
   if ($("#extras-go")) wireExtras();
   thread.querySelectorAll(".more").forEach(b => b.onclick = () => { const t = b.nextElementSibling; t.hidden = !t.hidden; b.setAttribute("aria-expanded", String(!t.hidden)); });
@@ -658,17 +662,29 @@ function wire() {
 }
 function wireExtras() {
   const q = $("#fav-q"), list = $("#fav-results");
-  if (q) q.oninput = () => {
-    clearTimeout(searchTimer); list.hidden = true; const v = q.value.trim(); if (v.length < 2) return;
-    searchTimer = setTimeout(async () => {
+  if (q) {
+    const loadResults = async (v, offset = 0) => {
       try {
-        const r = await api(`/search?q=${encodeURIComponent(v)}`);
-        list.innerHTML = r.items.length ? r.items.map(i => `<button type="button" data-id="${i.id}">${esc(perfumeLabel(i))}</button>`).join("") : '<p class="sub empty">ไม่พบรุ่นนี้ในรายการ</p>';
+        const r = await favoriteSearch(v, offset);
+        if (!q.isConnected || q.value.trim() !== v) return;
+        list.innerHTML = r.items.length ? r.items.map(i => `<button type="button" data-id="${i.id}">${favoriteLabel(i)}</button>`).join("") : '<p class="sub empty">ไม่พบรุ่นนี้ในรายการ</p>';
+        if (offset > 0) list.insertAdjacentHTML("beforeend", '<button type="button" data-prev>ผลก่อนหน้า</button>');
+        if (r.next_offset != null) list.insertAdjacentHTML("beforeend", '<button type="button" data-next>ดูผลเพิ่มเติม</button>');
         list.hidden = false;
-        list.querySelectorAll("[data-id]").forEach(b => b.onclick = () => { const i = r.items.find(x => x.id === Number(b.dataset.id)); d.favorite = {id: i.id, label: perfumeLabel(i)}; save(); render(); });
-      } catch {}
-    }, 250);
-  };
+        list.querySelectorAll("[data-id]").forEach(b => b.onclick = () => { d.favorite = favoriteChoice(r.items.find(x => x.id === Number(b.dataset.id))); save(); render(); });
+        const next = list.querySelector("[data-next]"), prev = list.querySelector("[data-prev]");
+        if (next) next.onclick = () => loadResults(v, r.next_offset);
+        if (prev) prev.onclick = () => loadResults(v, Math.max(0, offset - 10));
+      } catch {
+        if (!q.isConnected || q.value.trim() !== v) return;
+        list.innerHTML = '<p class="sub empty">ค้นหาไม่สำเร็จ ลองพิมพ์ชื่ออีกครั้งค่ะ</p>'; list.hidden = false;
+      }
+    };
+    q.oninput = () => {
+      clearTimeout(searchTimer); list.hidden = true; const v = q.value.trim(); if (v.length < 2) return;
+      searchTimer = setTimeout(() => loadResults(v), 250);
+    };
+  }
   const clear = $("#fav-clear"); if (clear) clear.onclick = () => { d.favorite = null; save(); render(); };
   thread.querySelectorAll("[data-img]").forEach(b => b.onclick = () => { d.image = d.image === b.dataset.img ? null : b.dataset.img; save(); b.closest(".opt").querySelectorAll("[data-img]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.img === d.image))); });
   thread.querySelectorAll("[data-style]").forEach(b => b.onclick = () => {
@@ -719,6 +735,7 @@ $("#withdraw").onclick = async () => {
       } catch (e) { if (e.status === 404) clearAll(); else throw e; }
     }
     if (d.intent === "owned") await resumeOwnedTrial();
+    if (stage() === "fav" && d.fav_q && d.fav_offset === undefined) { await findFavorite(d.fav_q); return; }
     render();
   } catch (e) {
     thread.innerHTML = `<p class="error" role="alert">ยังเชื่อมต่อ Senna ไม่ได้ ลองโหลดหน้านี้อีกครั้งค่ะ</p>`;

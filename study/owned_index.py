@@ -58,17 +58,18 @@ class OwnedIndex:
         if len(self.entries) != len({entry[-1]['id'] for entry in self.entries}):
             raise ValueError('Duplicate wardrobe index ID')
 
-    def search(self, query):
+    def search(self, query, offset=0):
         q, exact_query = search_key(query), name_key(query)
         if len(q) < 2:
-            return []
+            return [], None
         words = q.split()
         hits = []
         for exact, hay, tokens, length, item in self.entries:
             same_name = exact_query in exact
             if same_name or all(any(t.startswith(w) for t in tokens) or (len(w) >= 4 and w in hay) for w in words):
                 hits.append((not same_name, q not in hay, length, item['id'], {**item, 'exact_match': same_name}))
-        return [hit[-1] for hit in sorted(hits)[:10]]
+        end = offset + 10
+        return [hit[-1] for hit in sorted(hits)[offset:end]], end if end < len(hits) else None
 
 
 def describe_owned(item, families, sillage, explicit_families):

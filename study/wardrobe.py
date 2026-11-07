@@ -186,8 +186,9 @@ def make_wardrobe_router(adapter, index=None):
     extra = index.extra if index is not None else {}
 
     @router.get('/search')
-    def search(q: str = Query(default='', max_length=100)):
-        return {'items': index.search(q) if index is not None else adapter.search(q),
+    def search(q: str = Query(default='', max_length=100), offset: int = Query(default=0, ge=0, le=10_000)):
+        items, next_offset = index.search(q, offset) if index is not None else (adapter.search(q)[offset:], None)
+        return {'items': items, 'next_offset': next_offset,
                 'searchable_items': len(index.entries) if index is not None else len(adapter.engine.items)}
 
     @router.post("/compare")
