@@ -85,6 +85,11 @@ const user = (text, editField) => ({kind: "user", html: `<div class="msg user"><
 const widget = (html, cls = "") => ({kind: "widget", html: `<section class="widget ${cls}">${html}</section>`});
 const raw = html => ({kind: "raw", html});
 const perfumeLabel = i => (i.name.toLowerCase().startsWith(i.brand.toLowerCase()) ? i.name : `${i.brand} ${i.name}`);
+function exactPerfumeName(query, item) {
+  const key = text => text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const name = key(query);
+  return !!name && (name === key(item.name) || name === key(perfumeLabel(item)));
+}
 const isCollector = () => d.q6 === config.experience[0];
 const scenarioLabel = k => (config.scenarios[k] || "").replace(/^[ABC] /, "");
 const famLabel = k => config.families[k];
@@ -434,8 +439,13 @@ function buildOwnedChat() {
     if (o.items.length) B.push(widget(`<ul class="owned-chat-list">${o.items.map(it => `<li><span>${esc(perfumeLabel(it))}</span><button type="button" data-owned-remove="${it.id}" title="เอาออก" aria-label="เอา ${esc(perfumeLabel(it))} ออก">×</button></li>`).join("")}</ul>`));
     if (o.query) {
       B.push(user(o.query));
-      B.push(senna(o.matches?.length ? "เลือกรุ่นที่ตรงกับขวดของคุณค่ะ" : "ยังไม่พบรุ่นนี้ในรายการ จึงยังประเมินขวดนี้ไม่ได้ค่ะ ลองชื่อแบรนด์หรือชื่อภาษาอังกฤษอีกครั้งได้"));
-      if (o.matches?.length) B.push(widget(`<div class="fav-pick">${o.matches.map(it => `<button type="button" class="toggle" data-owned-add="${it.id}">${esc(perfumeLabel(it))}</button>`).join("")}</div>`));
+      const matches = o.matches || [];
+      if (matches.length) {
+        B.push(senna(matches.some(it => exactPerfumeName(o.query, it))
+          ? "เลือกรุ่นที่ตรงกับขวดของคุณค่ะ"
+          : "ยังไม่พบชื่อรุ่นตรงกับที่พิมพ์ค่ะ ด้านล่างเป็นชื่อใกล้เคียง เลือกเฉพาะถ้าตรงกับขวดที่มีนะคะ"));
+        B.push(widget(`<div class="fav-pick">${matches.map(it => `<button type="button" class="toggle" data-owned-add="${it.id}">${esc(perfumeLabel(it))}</button>`).join("")}<button type="button" class="toggle" id="owned-no-match">ไม่ใช่ขวดของฉัน</button></div>`));
+      } else B.push(senna("ยังไม่พบรุ่นนี้ในรายการ จึงยังประเมินขวดนี้ไม่ได้ค่ะ ลองชื่อแบรนด์หรือชื่อภาษาอังกฤษอีกครั้งได้"));
     }
     C.say = {ph: "ชื่อขวดที่มี เช่น CK One หรือ Chanel", hint: "ค้นหารุ่นในฐานข้อมูล ข้อความค้นหาไม่ถูกบันทึกเป็นคำตอบวิจัย", act: text => run(async () => {
       const result = await api(`/search?q=${encodeURIComponent(text)}`);
@@ -492,6 +502,11 @@ function wireOwnedChat() {
   if (o.stage === "entry-consent" || o.stage.startsWith("trial-")) { wireOwnedTrial(); return; }
   const back = $("#back-to-alternatives");
   if (back) back.onclick = () => scrollToOwnedSection("alternatives-answer");
+  const noMatch = $("#owned-no-match");
+  if (noMatch) noMatch.onclick = () => {
+    o.query = ""; o.matches = []; ownedStep("bottles");
+    $("#say-input")?.focus();
+  };
   thread.querySelectorAll("[data-owned-add]").forEach(button => button.onclick = () => {
     if (o.items.length >= 10) { lastError = "เลือกได้ไม่เกิน 10 ขวดค่ะ"; render(); return; }
     const item = o.matches.find(it => it.id === Number(button.dataset.ownedAdd));
