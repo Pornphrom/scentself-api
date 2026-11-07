@@ -84,7 +84,7 @@ const senna = (html, opts = {}) => ({kind: "senna", html: `<div class="msg senna
 const user = (text, editField) => ({kind: "user", html: `<div class="msg user"><div class="bubble">${esc(text)}${editField && canEdit(editField) ? `<button class="edit" type="button" data-edit="${editField}" aria-label="แก้คำตอบ ${esc(text)}">แก้</button>` : ""}</div></div>`});
 const widget = (html, cls = "") => ({kind: "widget", html: `<section class="widget ${cls}">${html}</section>`});
 const raw = html => ({kind: "raw", html});
-const perfumeLabel = i => (i.name.toLowerCase().startsWith(i.brand.toLowerCase()) ? i.name : `${i.brand} ${i.name}`);
+const perfumeLabel = i => (i.name.toLowerCase().startsWith(i.brand.toLowerCase()) ? i.name : `${i.brand} ${i.name}`) + (i.edition ? ` (${i.edition})` : "");
 function exactPerfumeName(query, item) {
   const key = text => text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
   const name = key(query);
@@ -406,7 +406,9 @@ function ownedAdviceSummary(items) {
     : `${perfumeLabel(first)} กับ${scenarioLabel(d.ownedChat.scenario)}:`;
 }
 function ownedAdviceBlocks(result, id = "owned-answer") {
-  const blocks = [senna(`<div id="${id}"><p>${esc(ownedAdviceSummary(result.items))}</p><p>${esc(result.items[0]?.assessment)}</p><p>${result.families_from_popularity ? "อ้างอิงแนวที่ผู้ตอบแบบสอบถามมักเลือกในโอกาสนี้" : "เทียบกับแนวกลิ่นที่คุณเลือก"} ไม่ใช่กฎตายตัว และไม่จำเป็นต้องซื้อขวดใหม่ค่ะ</p></div>`)];
+  const summary = result.comparison_limited ? "ดูข้อมูลได้ทีละขวดค่ะ ขวดที่อยู่นอกชุดทดลองยังไม่ถูกจัดอันดับเทียบกับขวดอื่น" : ownedAdviceSummary(result.items);
+  const verdict = result.comparison_limited ? "" : `<p>${esc(result.items[0]?.assessment)}</p>`;
+  const blocks = [senna(`<div id="${id}"><p>${esc(summary)}</p>${verdict}<p>${result.families_from_popularity ? "อ้างอิงแนวที่ผู้ตอบแบบสอบถามมักเลือกในโอกาสนี้" : "เทียบกับแนวกลิ่นที่คุณเลือก"} ไม่ใช่กฎตายตัว และไม่จำเป็นต้องซื้อขวดใหม่ค่ะ</p></div>`)];
   for (const it of result.items) blocks.push(widget(`<article class="owned-chat-advice">${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(perfumeLabel(it))}" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><h3>${esc(perfumeLabel(it))}</h3><p class="owned-verdict">${esc(it.assessment)}</p><p class="sub">${esc(it.family)} · ${esc(it.sillage)}${it.sillage_estimated ? " (ประมาณ)" : ""}</p><ul>${it.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>${it.cautions.map(caution => `<p class="owned-caution">${esc(caution)}</p>`).join("")}</div></article>`));
   return blocks;
 }
@@ -441,14 +443,14 @@ function buildOwnedChat() {
       B.push(user(o.query));
       const matches = o.matches || [];
       if (matches.length) {
-        B.push(senna(matches.some(it => exactPerfumeName(o.query, it))
+        B.push(senna(matches.some(it => it.exact_match ?? exactPerfumeName(o.query, it))
           ? "เลือกรุ่นที่ตรงกับขวดของคุณค่ะ"
           : "ยังไม่พบชื่อรุ่นตรงกับที่พิมพ์ค่ะ ด้านล่างเป็นชื่อใกล้เคียง เลือกเฉพาะถ้าตรงกับขวดที่มีนะคะ"));
-        B.push(widget(`<div class="fav-pick">${matches.map(it => `<button type="button" class="toggle" data-owned-add="${it.id}">${esc(perfumeLabel(it))}</button>`).join("")}<button type="button" class="toggle" id="owned-no-match">ไม่ใช่ขวดของฉัน</button></div>`));
+        B.push(widget(`<div class="fav-pick">${matches.map(it => `<button type="button" class="toggle" data-owned-add="${it.id}">${esc(perfumeLabel(it))}${it.coverage === "partial" ? ' <span class="sub">· ข้อมูลบางส่วน</span>' : it.coverage === "name_only" ? ' <span class="sub">· มีเฉพาะชื่อ</span>' : ""}</button>`).join("")}<button type="button" class="toggle" id="owned-no-match">ไม่ใช่ขวดของฉัน</button></div>`));
       } else B.push(senna("ยังไม่พบรุ่นนี้ในรายการ จึงยังประเมินขวดนี้ไม่ได้ค่ะ ลองชื่อแบรนด์หรือชื่อภาษาอังกฤษอีกครั้งได้"));
     }
     C.say = {ph: "ชื่อขวดที่มี เช่น CK One หรือ Chanel", hint: "ค้นหารุ่นในฐานข้อมูล ข้อความค้นหาไม่ถูกบันทึกเป็นคำตอบวิจัย", act: text => run(async () => {
-      const result = await api(`/search?q=${encodeURIComponent(text)}`);
+      const result = await api(`/wardrobe/search?q=${encodeURIComponent(text)}`);
       o.query = text; o.matches = result.items.filter(it => !o.items.some(p => p.id === it.id)); save();
     })};
     if (o.items.length) C.chips.push({label: "ใช้ขวดที่เลือก", act: () => ownedStep("families")});
@@ -477,14 +479,14 @@ function buildOwnedChat() {
   if (o.trial?.server?.state === "complete" && o.trial.completedContext === JSON.stringify(ownedContext())) {
     B.push(senna(`<p>บันทึกผลทดลองเลือกใช้แล้วค่ะ ไม่นับรวมกับการเลือกซื้อ</p><p class="receipt owned-receipt">รหัสรอบทดลอง: ${esc(o.trial.id)}</p>`));
   } else if (o.stage === "result") {
-    B.push(senna(`<p class="private-advice-notice" role="status">${o.items.length > 1 ? "รอบนี้เป็นคำแนะนำอย่างเดียว ยังไม่มีคะแนนก่อน–หลังที่ส่งไว้ค่ะ" : "ตอนนี้เลือกไว้หนึ่งขวด จึงประเมินความเหมาะสมให้ได้ แต่ยังเปรียบเทียบการจัดอันดับขวดที่มีสองวิธีไม่ได้ค่ะ"}</p>`));
+    B.push(senna(`<p class="private-advice-notice" role="status">${o.result.comparison_limited || o.items.length > 1 ? "รอบนี้เป็นคำแนะนำอย่างเดียว ยังไม่มีคะแนนก่อน–หลังที่ส่งไว้ค่ะ" : "ตอนนี้เลือกไว้หนึ่งขวด จึงประเมินความเหมาะสมให้ได้ แต่ยังเปรียบเทียบการจัดอันดับขวดที่มีสองวิธีไม่ได้ค่ะ"}</p>`));
   }
   B.push(senna("ความชอบจริงอาจต่างจากข้อมูลกลิ่นค่ะ ลองเทียบกับกลิ่นที่คุณเคยดมและบรรยากาศจริงของงานด้วย"));
   const more = buildOwnedAlternatives(B, C, o); if (more) return more;
   C.chips = [{label: "แนะนำขวดอื่นเพิ่มเติม", act: requestOwnedAlternatives}, {label: "เลือกใช้ขวดเดิม", act: chooseExistingBottle},
     {label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}, {label: "เพิ่มหรือเปลี่ยนขวด", act: () => ownedStep("bottles")},
     {label: session?.state === "complete" ? "กลับผลรอบทดลองที่จบแล้ว" : "เปลี่ยนเป้าหมาย", soft: true, act: leaveOwnedChat}];
-  if (config.mode === "pilot" && o.items.length > 1 && o.trial?.server?.state !== "complete") C.chips.unshift({label: "ประเมินคำแนะนำสองชุด", act: () => { o.activeTrialTask = "owned_use"; offerOwnedTrial(); }});
+  if (config.mode === "pilot" && o.items.length > 1 && ownedTrialEligible(o) && o.trial?.server?.state !== "complete") C.chips.unshift({label: "ประเมินคำแนะนำสองชุด", act: () => { o.activeTrialTask = "owned_use"; offerOwnedTrial(); }});
   return {B, C};
 }
 function compareOwnedChat() {

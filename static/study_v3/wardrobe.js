@@ -1,7 +1,7 @@
 "use strict";
 const $ = selector => document.querySelector(selector);
 const esc = text => String(text ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const label = item => item.name.toLowerCase().startsWith(item.brand.toLowerCase()) ? item.name : `${item.brand} ${item.name}`;
+const label = item => (item.name.toLowerCase().startsWith(item.brand.toLowerCase()) ? item.name : `${item.brand} ${item.name}`) + (item.edition ? ` (${item.edition})` : '');
 let owned = [], config, searching, searchVersion = 0, revision = 0, busy = false;
 
 async function api(path, options = {}) {
@@ -34,7 +34,7 @@ $('#owned-search').oninput = () => {
   if (query.length < 2) return;
   searching = setTimeout(async () => {
     try {
-      const result = await api('/search?q=' + encodeURIComponent(query));
+      const result = await api('/wardrobe/search?q=' + encodeURIComponent(query));
       if (version !== searchVersion) return;
       const available = result.items.filter(item => !owned.some(p => p.id === item.id));
       if (!available.length) { message('#search-status', result.items.length ? 'เพิ่มรุ่นที่พบไว้แล้ว' : 'ไม่พบรุ่นนี้ในฐานข้อมูล ลองชื่อภาษาอังกฤษหรือแบรนด์อื่น'); return; }
@@ -54,7 +54,8 @@ $('#owned-search').addEventListener('keydown', event => { if (event.key === 'Ent
 
 function showAdvice(result) {
   const source = result.families_from_popularity ? 'แนวที่ผู้ตอบแบบสอบถามมักเลือก' : 'แนวกลิ่นที่คุณเลือก';
-  $('#owned-advice').innerHTML = `<h2>${result.items.length > 1 ? 'ขวดที่น่าลองสำหรับครั้งนี้' : 'ขวดนี้กับโอกาสที่เลือก'}</h2><p>${esc(result.scenario.replace(/^[ABC] /, ''))} · ${source}: ${esc(result.families.join(' / '))}</p><p class="sub">เทียบเฉพาะขวดที่เลือก ไม่ใช้ราคาหรือการหาซื้อเป็นคะแนน อ้างอิงแนวกลิ่นกับรูปแบบการเลือกตามโอกาสในแบบสอบถาม ไม่ใช่กฎตายตัว ความชอบหลังทดลองดมอาจต่างจากข้อมูลกลิ่น</p><div class="owned-advice-grid">${result.items.map((item, index) => `<article class="owned-card">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(label(item))}" referrerpolicy="no-referrer" loading="lazy">` : '<div class="missing-photo">ไม่มีภาพ</div>'}<div class="owned-card-body"><span class="rank">${index === 0 && result.items.length > 1 ? 'น่าลองก่อน' : `ตัวเลือก ${index + 1}`}</span><p class="brand">${esc(item.brand)}</p><h3>${esc(item.name)}</h3><div class="facts">${esc(item.family)} · ${esc(item.sillage)}${item.sillage_estimated ? ' (ประมาณ)' : ''}</div><ul>${item.reasons.map(reason => `<li>${esc(reason)}</li>`).join('')}</ul>${item.cautions.map(caution => `<p class="caution">${esc(caution)}</p>`).join('')}${/^https:\/\//.test(item.url) ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">แหล่งข้อมูลน้ำหอม</a>` : ''}</div></article>`).join('')}</div>`;
+  const heading = result.comparison_limited ? 'ข้อมูลขวดที่เลือก · ไม่จัดอันดับ' : result.items.length > 1 ? 'ขวดที่น่าลองสำหรับครั้งนี้' : 'ขวดนี้กับโอกาสที่เลือก';
+  $('#owned-advice').innerHTML = `<h2>${heading}</h2><p>${esc(result.scenario.replace(/^[ABC] /, ''))} · ${source}: ${esc(result.families.join(' / '))}</p><p class="sub">เทียบเฉพาะขวดที่เลือก ไม่ใช้ราคาหรือการหาซื้อเป็นคะแนน อ้างอิงแนวกลิ่นกับรูปแบบการเลือกตามโอกาสในแบบสอบถาม ไม่ใช่กฎตายตัว ความชอบหลังทดลองดมอาจต่างจากข้อมูลกลิ่น</p><div class="owned-advice-grid">${result.items.map((item, index) => `<article class="owned-card">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(label(item))}" referrerpolicy="no-referrer" loading="lazy">` : '<div class="missing-photo">ไม่มีภาพ</div>'}<div class="owned-card-body"><span class="rank">${!result.comparison_limited && index === 0 && result.items.length > 1 ? 'น่าลองก่อน' : `ตัวเลือก ${index + 1}`}</span><p class="brand">${esc(item.brand)}</p><h3>${esc(item.name)}</h3><div class="facts">${esc(item.family)} · ${esc(item.sillage)}${item.sillage_estimated ? ' (ประมาณ)' : ''}</div><ul>${item.reasons.map(reason => `<li>${esc(reason)}</li>`).join('')}</ul>${item.cautions.map(caution => `<p class="caution">${esc(caution)}</p>`).join('')}${/^https:\/\//.test(item.url) ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">แหล่งข้อมูลน้ำหอม</a>` : ''}</div></article>`).join('')}</div>`;
   $('#owned-advice').hidden = false;
   $('#owned-advice').querySelectorAll('img').forEach(img => img.onerror = () => { const span = document.createElement('span'); span.className = 'missing-photo'; span.textContent = 'ไม่มีภาพ'; img.replaceWith(span); });
   $('#owned-advice').scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'});

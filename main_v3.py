@@ -14,12 +14,13 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from study.config import Settings
+from study.owned_index import OwnedIndex
 from study.routes import make_router
 from study.wardrobe import make_wardrobe_router
 from study.owned_study import make_owned_study_router
 from study_v3_adapter import EngineAdapterV3
 
-UI_VERSION = "senna-chat-v3-q24-problems-20261107-owned-search"
+UI_VERSION = "senna-chat-v3-q24-problems-20261107-owned-index"
 STATIC = Path(__file__).resolve().parent / "static" / "study_v3"
 
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
@@ -32,7 +33,8 @@ def create_app(settings=None):
     app = FastAPI(title="ScentSelf Senna v3", docs_url=None, redoc_url=None)
     adapter = EngineAdapterV3()
     app.include_router(make_router(settings, adapter=adapter))
-    app.include_router(make_wardrobe_router(adapter))
+    owned_index = OwnedIndex(adapter.engine.items, Path(__file__).resolve().parent / 'study/owned_index.json')
+    app.include_router(make_wardrobe_router(adapter, owned_index))
     app.include_router(make_owned_study_router(settings, adapter))
     app.mount("/senna/assets", StaticFiles(directory=str(STATIC)), name="senna-v3-assets")
 

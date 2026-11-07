@@ -45,11 +45,14 @@ function ownedContext() {
   const o = d.ownedChat;
   return {owned_ids: o.items.map(it => it.id), scenario: o.scenario, families: o.families, sillage: o.sillage};
 }
+function ownedTrialEligible(o) {
+  return !!o.items?.length && o.items.every(it => it.research_eligible !== false);
+}
 function finishOwnedPreferences() {
   const o = d.ownedChat;
   if (o.result?.items?.length) o.privateAdviceSeen = true;
   o.activeTrialTask = "owned_use";
-  if (o.items.length > 1 && config.mode === "pilot" && o.researchMode !== "private") return offerOwnedTrial();
+  if (o.items.length > 1 && ownedTrialEligible(o) && config.mode === "pilot" && o.researchMode !== "private") return offerOwnedTrial();
   else compareOwnedChat();
 }
 function ownedTrialApi(path, method = "GET", body, task = decisionTask()) {
@@ -58,6 +61,7 @@ function ownedTrialApi(path, method = "GET", body, task = decisionTask()) {
     headers: {Authorization: `Bearer ${t.secret}`}, ...(body === undefined ? {} : {body: JSON.stringify(body)})});
 }
 async function offerOwnedTrial() {
+  if (!ownedTrialEligible(d.ownedChat)) return decisionTask() === FOLLOWUP_TASK ? fetchOwnedAlternatives() : compareOwnedChat();
   await run(async () => {
     const t = decisionTrial();
     if (t?.server && t.server.state !== "complete") {
@@ -244,7 +248,7 @@ function requestOwnedAlternatives() {
 }
 function finishAlternativePreferences() {
   const o = d.ownedChat; o.activeTrialTask = FOLLOWUP_TASK;
-  if (config.mode === "pilot" && o.researchMode !== "private") return offerOwnedTrial();
+  if (config.mode === "pilot" && ownedTrialEligible(o) && o.researchMode !== "private") return offerOwnedTrial();
   else fetchOwnedAlternatives();
 }
 function fetchOwnedAlternatives() {
@@ -287,7 +291,7 @@ function buildOwnedAlternatives(B, C, o) {
   C.chips = [{label: "ดูคำแนะนำขวดที่มี", act: () => scrollToOwnedSection("owned-answer")},
     {label: "เลือกใช้ขวดเดิม", act: chooseExistingBottle}, {label: "จบการคุย", act: () => finishOwnedDecision(null)}, {label: "เปลี่ยนงบ", act: () => { o.budgetSet = false; requestOwnedAlternatives(); }},
     {label: "เปลี่ยนโอกาสใช้งาน", act: () => ownedStep("scenario")}];
-  if (config.mode === "pilot" && t?.server?.state !== "complete") C.chips.unshift({label: "ประเมินคำแนะนำสองชุด", act: () => { o.activeTrialTask = FOLLOWUP_TASK; offerOwnedTrial(); }});
+  if (config.mode === "pilot" && ownedTrialEligible(o) && t?.server?.state !== "complete") C.chips.unshift({label: "ประเมินคำแนะนำสองชุด", act: () => { o.activeTrialTask = FOLLOWUP_TASK; offerOwnedTrial(); }});
   return {B, C};
 }
 function chooseExistingBottle() {

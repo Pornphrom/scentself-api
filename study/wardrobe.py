@@ -1,12 +1,13 @@
 """Stateless advice for an owned collection, outside the pre/post study protocol."""
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 import numpy as np
 from pydantic import Field, field_validator
 
 from engine_v2.engine_v2 import SILLAGE_TH, TIER_TH
 from engine_v2.family_eligibility import PROFILE_SUPPORT, family_match
+from .owned_index import describe_owned
 from .schemas import FAMILIES, SCENARIOS, Payload
 
 SCENARIO_WEIGHT = 0.15  # Prototype utility only, not a fitted/validated research weight.
@@ -96,16 +97,19 @@ def alternative_family_match(engine, item, requested):
     return family_match(engine, item, requested)
 
 
-def suggest_alternatives(adapter, body, method="A"):
+def suggest_alternatives(adapter, body, method="A", *, extra=None):
     engine = adapter.engine
-    if any(i not in engine.by_id for i in body.owned_ids):
+    extra = extra or {}
+    if any(i not in engine.by_id and i not in extra for i in body.owned_ids):
         raise ValueError("ไม่พบขวดเดิมบางรุ่นในฐานข้อมูล")
     budget = body.budget if body.budget in (0, 1) else None
     with adapter.lock:
         result = engine.recommend(SCENARIOS[body.scenario], families=[FAMILIES[f] for f in body.families] or None,
                                   sillage=body.sillage, budget=budget, k=len(engine.items))
     items = []
-    owned = [engine.items[engine.by_id[i]] for i in body.owned_ids]
+    owned = [engine.items[engine.by_id[i]] if i in engine.by_id
+             else {**extra[i], 'sillage_source': 'vote' if extra[i]['sillage'] is not None else 'unknown'}
+             for i in body.owned_ids]
     requested = [FAMILIES[f] for f in body.families]
     candidates = []
     for rank, raw in enumerate(result[method]):
@@ -123,7 +127,7 @@ def suggest_alternatives(adapter, body, method="A"):
                 and all(it['sillage_source'] == 'vote' and it['sillage'] != body.sillage for it in owned)):
             differences.append("ระดับการกระจายกลิ่นที่บันทึกตรงกับที่ขอ ขณะที่ขวดเดิมที่เลือกยังไม่ตรงระดับนี้")
         if (body.families and item['family'] in [FAMILIES[f] for f in body.families]
-                and all(it['family'] != item['family'] for it in owned)):
+                and all(it['family'] and it['family'] != item['family'] for it in owned)):
             differences.append(f"แนวหลักที่บันทึกเป็น{item['family']} ต่างจากแนวหลักของขวดเดิมที่เลือก")
         if not differences:
             differences.append("เป็นตัวเลือกนอกขวดที่มี ยังไม่ได้ยืนยันว่าตรงกว่าขวดเดิมทุกด้าน")
@@ -154,20 +158,54 @@ def suggest_alternatives(adapter, body, method="A"):
             "context": body.model_dump(), "items": items}
 
 
-def make_wardrobe_router(adapter):
+def assess_private(adapter, body, extra):
+    frozen_ids = [i for i in body.owned_ids if i in adapter.engine.by_id]
+    supplemental_ids = [i for i in body.owned_ids if i not in adapter.engine.by_id]
+    if any(i not in extra for i in supplemental_ids):
+        raise ValueError('มีรุ่นที่ไม่พบในฐานข้อมูล กรุณาเลือกจากผลค้นหาอีกครั้ง')
+    if not supplemental_ids:
+        return assess_owned(adapter, body)
+    families = [FAMILIES[f] for f in body.families] or adapter.engine.popular_families(SCENARIOS[body.scenario], 2)
+    if frozen_ids:
+        result = assess_owned(adapter, body.model_copy(update={'owned_ids': frozen_ids}))
+        catalog_cards = {it['id']: it for it in result['items']}
+    else:
+        result = dict(mode='owned_collection', policy_version=OWNED_POLICY, research_data_saved=False,
+                      scenario=SCENARIOS[body.scenario], families=families, families_from_popularity=not bool(body.families),
+                      engine=adapter.engine_version, catalog_sha256=adapter.catalog_hash)
+        catalog_cards = {}
+    result['items'] = [catalog_cards[i] if i in catalog_cards
+                       else describe_owned(extra[i], result['families'], body.sillage, bool(body.families))
+                       for i in body.owned_ids]
+    result['comparison_limited'] = True
+    return result
+
+
+def make_wardrobe_router(adapter, index=None):
     router = APIRouter(prefix="/v2/wardrobe", tags=["Owned collection (not study)"])
+    extra = index.extra if index is not None else {}
+
+    @router.get('/search')
+    def search(q: str = Query(default='', max_length=100)):
+        return {'items': index.search(q) if index is not None else adapter.search(q),
+                'searchable_items': len(index.entries) if index is not None else len(adapter.engine.items)}
 
     @router.post("/compare")
     def compare(body: OwnedComparison):
         try:
-            return assess_owned(adapter, body)
+            result = assess_private(adapter, body, extra)
+            if index is not None:
+                for it in result['items']:
+                    if edition := index.editions.get(it['id']):
+                        it['edition'] = edition
+            return result
         except ValueError as error:
             raise HTTPException(422, str(error)) from None
 
     @router.post("/alternatives")
     def alternatives(body: Alternatives):
         try:
-            return suggest_alternatives(adapter, body)
+            return suggest_alternatives(adapter, body, extra=extra)
         except ValueError as error:
             raise HTTPException(422, str(error)) from None
 
