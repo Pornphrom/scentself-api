@@ -57,8 +57,14 @@ class Store:
 
     def withdraw(self, session_id, secret):
         self.get(session_id, secret)
+        self.withdraw_by_id(session_id)
+
+    def withdraw_by_id(self, session_id):
+        now = time.time()
         with self.connect() as db:
-            db.execute("UPDATE sessions SET state='withdrawn',payload=?,updated=? WHERE id=?", (json.dumps({"withdrawn": True, "withdrawn_at": time.time()}), time.time(), session_id))
+            result = db.execute("UPDATE sessions SET state='withdrawn',payload=?,updated=? WHERE id=? AND state<>'withdrawn'",
+                                (json.dumps({"withdrawn": True, "withdrawn_at": now}), now, session_id))
+            return bool(result.rowcount) or db.execute("SELECT 1 FROM sessions WHERE id=?", (session_id,)).fetchone() is not None
 
     def mark_viewed(self, session_id, secret, slot, timestamp):
         with self.connect() as db:

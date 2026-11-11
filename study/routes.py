@@ -3,6 +3,7 @@ import json
 import secrets
 import time
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import Response
@@ -223,6 +224,14 @@ def make_router(settings, store=None, adapter=None, explainer=None):
         token = secret_from(authorization)
         if not secrets.compare_digest(token, settings.admin_token):
             raise HTTPException(403, "ไม่อนุญาต")
+
+    if settings.mode == "live":
+        @router.delete("/admin/live/sessions/{sid}", include_in_schema=False)
+        def withdraw_live_participant(sid: UUID, authorization: str | None = Header(default=None)):
+            admin(authorization)
+            if not store.withdraw_by_id(str(sid)):
+                raise HTTPException(404, "ไม่พบรหัสผู้เข้าร่วมในรอบเก็บจริง")
+            return {"state": "withdrawn"}
 
     @router.get("/admin/export.csv")
     def export_csv(authorization: str | None = Header(default=None)):

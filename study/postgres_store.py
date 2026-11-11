@@ -82,10 +82,18 @@ class PostgresStore:
     def withdraw(self, session_id, secret):
         with self.connect() as db:
             self._locked(db, session_id, secret)
-            now = time.time()
-            payload = json.dumps({"withdrawn": True, "withdrawn_at": now})
-            db.execute(sql.SQL("UPDATE {} SET state='withdrawn',payload=%s,updated=%s WHERE id=%s").format(self.table),
-                       (payload, now, session_id))
+            self._withdraw(db, session_id)
+
+    def _withdraw(self, db, session_id):
+        now = time.time()
+        payload = json.dumps({"withdrawn": True, "withdrawn_at": now})
+        result = db.execute(sql.SQL("UPDATE {} SET state='withdrawn',payload=%s,updated=%s WHERE id=%s AND state<>'withdrawn'").format(self.table),
+                            (payload, now, session_id))
+        return bool(result.rowcount) or db.execute(sql.SQL("SELECT 1 FROM {} WHERE id=%s").format(self.table), (session_id,)).fetchone() is not None
+
+    def withdraw_by_id(self, session_id):
+        with self.connect() as db:
+            return self._withdraw(db, session_id)
 
     def mark_viewed(self, session_id, secret, slot, timestamp):
         with self.connect() as db:
