@@ -1,5 +1,5 @@
 {
-  "status": "live_free_release",
+  "status": "live_free_collection_closed",
   "hosting": "free",
   "versions": {
     "catalog": "catalog_v3.3_gender_20261106",
@@ -58,7 +58,7 @@
     "engine_v2/family_eligibility.py": "64dc8b9a3d8b2421b7cdfeaeab4baff7bac98a5871fca908e6155fc71dff6b15",
     "study/owned_index.py": "bb1643034298b27c34b81333d18510c5662d9f9717917935cfbf73496e7afbaa",
     "study/owned_index.json": "11395963809c81a31736e57af827a2277fc2ba308cb3b1b0e2ecd55ba682a4f4",
-    "main_live_free.py": "04f0387187dcde0d5731cac527b7b797ce17762d1628908c10d84dd8706d5964"
+    "main_live_free.py": "1e111272c324e3841b7ceb80ac9c05d1d1280fc9cb8173a422d1a94fc3673bdb"
   },
   "pilot_source_commit": "55eac51ed7debde1c87304fbc3d5ac9c9521a81b",
   "live_consent": {

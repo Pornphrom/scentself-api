@@ -1,8 +1,10 @@
 """Dedicated main-study entry point; never start in pilot mode or use local storage."""
 import os
 from datetime import date
+from html import escape
 
 from dotenv import load_dotenv
+from fastapi.responses import HTMLResponse, JSONResponse
 from psycopg.conninfo import conninfo_to_dict
 
 from study.config import ROOT, Settings
@@ -11,6 +13,36 @@ from study.postgres_store import validate_database_url
 CONSENT = 'live-consent-20261107'
 MODEL = 'gemini-3.5-flash-lite'
 MAX_DAILY_ATTEMPTS = 150
+COLLECTION_CLOSED = "ปิดรับคำตอบรอบวิจัยแล้ว"
+
+
+def close_collection(app, contact):
+    @app.middleware("http")
+    async def closed_study(request, call_next):
+        path = request.url.path.rstrip("/") or "/"
+        if request.method in {"GET", "HEAD"} and path in {"/", "/senna", "/senna/wardrobe"}:
+            return HTMLResponse(f"""<!doctype html>
+<html lang="th"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{COLLECTION_CLOSED} | Senna</title>
+<body style="margin:0;color:#20312c;background:#f4f7f5;font:1rem/1.7 system-ui,sans-serif">
+<main style="max-width:38rem;margin:12vh auto;padding:0 1.5rem">
+<p>Senna · ScentSelf</p>
+<h1>{COLLECTION_CLOSED}</h1>
+<p>ขอบคุณทุกคนที่ร่วมทดลองใช้ Senna ค่ะ ตอนนี้ไม่รับคำตอบเพิ่มเติมแล้ว</p>
+<p>หากต้องการถอนข้อมูลที่เคยส่งไว้ กรุณาติดต่อผู้วิจัยเป็นการส่วนตัวพร้อมรหัสผู้เข้าร่วม</p>
+<p>ช่องทางติดต่อ: {escape(contact)}</p>
+</main></body></html>""", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+                                    "X-Content-Type-Options": "nosniff",
+                                    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"})
+        if request.method in {"POST", "PUT", "PATCH"} and any(
+            path == prefix or path.startswith(prefix + "/")
+            for prefix in ("/v2/study/sessions", "/v2/owned-study/sessions")
+        ):
+            return JSONResponse({"detail": COLLECTION_CLOSED}, status_code=410, headers={"Cache-Control": "no-store"})
+        return await call_next(request)
+
+    return app
 
 
 def validate_live_hosting(settings, database_host):
@@ -40,4 +72,4 @@ def create_app():
     settings = Settings.from_env()
     validate_live_hosting(settings, os.getenv('SCENTSELF_LIVE_DATABASE_HOST', ''))
     from main_v3 import create_app as create_v3_app
-    return create_v3_app(settings)
+    return close_collection(create_v3_app(settings), settings.contact)
