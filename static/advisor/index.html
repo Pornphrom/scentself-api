@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#24564a">
+  <title>คุยกับ Senna</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/advisor/assets/chat-theme.css">
+  <link rel="stylesheet" href="/advisor/assets/advisor.css?v=commerce">
+  <script defer src="/advisor/assets/advisor-analytics.js?v=1"></script>
+  <script defer src="/advisor/assets/advisor-input.js?v=outfit-style"></script>
+  <script defer src="/advisor/assets/advisor.js?v=commerce"></script>
+</head>
+<body class="advisor">
+  <header class="bar">
+    <div class="bar-inner">
+      <div class="who">
+        <span class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v4.2a6 6 0 1 0 4 0V3M8.2 14.5h7.6"/></svg></span>
+        <span><strong>Senna</strong><small>ที่ปรึกษาน้ำหอม</small></span>
+      </div>
+      <ol class="journey" aria-label="ขั้นตอน">
+        <li id="talk-step" aria-current="step">เล่าความต้องการ</li><li id="result-step">ดูตัวเลือก</li>
+      </ol>
+      <button id="restart" class="restart" type="button" aria-label="เริ่มคุยใหม่" title="เริ่มคุยใหม่" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 1 2.64 6.36M3 12V6m0 6h6"/></svg>
+      </button>
+      <button id="analytics-settings" class="analytics-settings" type="button" hidden>การเก็บสถิติ</button>
+    </div>
+  </header>
+  <section id="analytics-consent" class="analytics-consent" aria-label="การเก็บสถิติการใช้งาน" hidden>
+    <p>อนุญาตให้ใช้ Google Analytics เก็บสถิติการดูคำแนะนำ เลือกขวด และกดไปร้านค้าไหมคะ? Google จะได้รับข้อมูลเบราว์เซอร์และอุปกรณ์ และอาจใช้คุกกี้เพื่อวัดการใช้งาน เราไม่ส่งข้อความแชท รูป หรือรหัสผู้เข้าร่วม เปลี่ยนใจได้ที่ปุ่มสถิติ และใช้งานต่อได้แม้ไม่อนุญาต</p>
+    <div class="chips">
+      <button id="analytics-reject" class="chip" type="button">ไม่อนุญาต</button>
+      <button id="analytics-accept" class="chip" type="button">อนุญาตเก็บสถิติ</button>
+    </div>
+  </section>
+  <main id="conversation" aria-label="บทสนทนากับ Senna">
+    <div class="thread" id="thread">
+      <div id="messages" role="log" aria-live="polite"></div>
+      <div id="active-panel"></div>
+      <p id="error" class="error" role="alert" hidden></p>
+      <div id="bottom"></div>
+    </div>
+  </main>
+  <footer class="composer">
+    <div class="composer-inner">
+      <div id="choices" class="chips" aria-label="คำตอบที่เลือกได้"></div>
+      <form id="reply" class="say" hidden>
+        <input id="outfit-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+        <button id="attach-outfit" class="attach" type="button" aria-label="แนบรูปชุด" title="แนบรูปชุด" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        </button>
+        <input id="text" type="text" maxlength="100" autocomplete="off" aria-label="ข้อความถึง Senna">
+        <button class="send" type="submit" aria-label="ส่งข้อความ" title="ส่งข้อความ">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-6 6 6-6 6"/></svg>
+        </button>
+      </form>
+    </div>
+  </footer>
+</body>
+</html>
