@@ -7,8 +7,8 @@
   <title>คุยกับ Senna</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/advisor/assets/chat-theme.css">
-  <link rel="stylesheet" href="/advisor/assets/advisor.css?v=commerce">
-  <script defer src="/advisor/assets/advisor-analytics.js?v=1"></script>
+  <link rel="stylesheet" href="/advisor/assets/advisor.css?v=analytics-notice">
+  <script defer src="/advisor/assets/advisor-analytics.js?v=automatic-notice"></script>
   <script defer src="/advisor/assets/advisor-input.js?v=outfit-style"></script>
   <script defer src="/advisor/assets/advisor.js?v=commerce"></script>
 </head>
@@ -29,7 +29,7 @@
     </div>
   </header>
   <section id="analytics-consent" class="analytics-consent" aria-label="การเก็บสถิติการใช้งาน" hidden>
-    <p>อนุญาตให้ใช้ Google Analytics เก็บสถิติการดูคำแนะนำ เลือกขวด และกดไปร้านค้าไหมคะ? Google จะได้รับข้อมูลเบราว์เซอร์และอุปกรณ์ และอาจใช้คุกกี้เพื่อวัดการใช้งาน เราไม่ส่งข้อความแชท รูป หรือรหัสผู้เข้าร่วม เปลี่ยนใจได้ที่ปุ่มสถิติ และใช้งานต่อได้แม้ไม่อนุญาต</p>
+    <p id="analytics-copy">อนุญาตให้ใช้ Google Analytics เก็บสถิติการดูคำแนะนำ เลือกขวด และกดไปร้านค้าไหมคะ? Google จะได้รับข้อมูลเบราว์เซอร์และอุปกรณ์ และอาจใช้คุกกี้เพื่อวัดการใช้งาน เราไม่ส่งข้อความแชท รูป หรือรหัสผู้เข้าร่วม เปลี่ยนใจได้ที่ปุ่มสถิติ และใช้งานต่อได้แม้ไม่อนุญาต</p>
     <div class="chips">
       <button id="analytics-reject" class="chip" type="button">ไม่อนุญาต</button>
       <button id="analytics-accept" class="chip" type="button">อนุญาตเก็บสถิติ</button>
@@ -56,6 +56,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-6 6 6-6 6"/></svg>
         </button>
       </form>
+      <p id="analytics-notice" class="analytics-notice" hidden></p>
     </div>
   </footer>
 </body>

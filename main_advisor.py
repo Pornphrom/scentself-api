@@ -278,7 +278,9 @@ def create_app():
     @app.get("/advisor/api/integrations")
     def integrations():
         measurement_id = os.getenv("SCENTSELF_ADVISOR_GA4_ID", "").strip()
-        return {"ga4_measurement_id": measurement_id if re.fullmatch(r"G-[A-Z0-9]{6,20}", measurement_id) else None}
+        mode = os.getenv("SCENTSELF_ADVISOR_ANALYTICS_MODE", "opt_in")
+        return {"ga4_measurement_id": measurement_id if re.fullmatch(r"G-[A-Z0-9]{6,20}", measurement_id) else None,
+                "analytics_mode": "automatic_notice" if mode == "automatic_notice" else "opt_in"}
 
     @app.get("/advisor/api/options")
     def options():

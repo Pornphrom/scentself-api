@@ -2,6 +2,26 @@
 
 Research services and their data are not changed by these integrations.
 
+## Automatic collection mode requested on 21 November 2026
+
+SCENTSELF_ADVISOR_ANALYTICS_MODE=automatic_notice removes the initial permission
+question and collects GA4 data on first visit, with a persistent disclosure and
+statistics controls. This is collection before consent, NOT a consent
+management or legal compliance solution. Notice or an opt-out is not equivalent
+to consent. Before enabling this mode for visitors, the operator must establish
+a lawful basis, satisfy applicable regional requirements and Google's terms,
+and provide the required privacy information. In jurisdictions requiring prior
+consent, use opt_in instead; this application does not perform geolocation or
+region-specific legal checks.
+
+The service does not write a user-consent record or send analytics consent as
+granted merely because automatic mode is active. Analytics cookies can still be
+set by GA4. Ads consent remains denied; Google signals/personalization remain
+disabled. Prior denials, Global Privacy Control and Do Not Track are respected.
+Turning collection off stops further events and clears GA cookies. It does not
+delete already received data in Google Analytics. The opt_in behavior below
+remains the default when the mode is unset or invalid.
+
 ## Shopping links
 
 advisor_commerce.py holds exact brand/name matches for product pages checked
@@ -27,7 +47,14 @@ Links never influence recommendation ranking.
    configured, the Google tag is blocked until consent is granted. Refusing
    analytics does not block recommendations or shopping links.
 5. Use GA4 Realtime or DebugView to verify your actual property before launch.
-   No actual property has been connected or verified by this change.
+   The initial release left analytics inactive. On 21 November 2026 the user
+   supplied G-C54LLBYMB5, which was configured on the product service only.
+   A fresh-browser test confirmed Google collection endpoint responses for
+   page_view, view_item_list, select_item, and shop_click after consent, no
+   Google tag before consent, and disabled collection plus deleted GA cookies
+   after revocation. Test events were marked debug_mode. Dashboard processing
+   and the Reports UI were not inspected; the property owner should verify
+   Realtime or DebugView.
 
 Events:
 

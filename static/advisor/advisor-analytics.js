@@ -2,27 +2,34 @@
 
 (() => {
   const key = "senna-product-analytics-v1";
-  let id = null, granted = false, initialized = false;
+  let id = null, enabled = false, initialized = false, automatic = false;
   const banner = document.getElementById("analytics-consent");
   const setting = document.getElementById("analytics-settings");
+  const notice = document.getElementById("analytics-notice");
+  const privacySignal = () => navigator.globalPrivacyControl === true || navigator.doNotTrack === "1";
   const safeItems = items => (items || []).slice(0, 10)
     .filter(item => Number.isInteger(item.id) && item.id > 0)
     .map(item => ({item_id: String(item.id)}));
   function saved() { try { return localStorage.getItem(key); } catch { return null; } }
   function remember(value) { try { localStorage.setItem(key, value); } catch { /* Choice still applies in this tab. */ } }
   function command() { window.dataLayer.push(arguments); }
-  function init() {
+  function init(explicitConsent) {
     window["ga-disable-" + id] = false;
     if (initialized) {
-      command("consent", "update", {analytics_storage: "granted"});
+      if (explicitConsent) command("consent", "update", {analytics_storage: "granted"});
+      else {
+        // Re-enable only after an explicit click, not after an automatic reload.
+        command("config", id, {send_page_view: false});
+      }
       return;
     }
     initialized = true;
     window.dataLayer = window.dataLayer || [];
-    command("consent", "default", {
-      analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied",
-    });
-    command("consent", "update", {analytics_storage: "granted"});
+    const defaults = {ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied"};
+    if (!automatic || explicitConsent) defaults.analytics_storage = "denied";
+    command("consent", "default", defaults);
+    // Automatic collection is not recorded or transmitted as user consent.
+    if (explicitConsent) command("consent", "update", {analytics_storage: "granted"});
     command("js", new Date());
     command("config", id, {
       send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false,
@@ -35,9 +42,8 @@
     command("event", "page_view", {page_location: location.origin + "/advisor", page_referrer: "", page_title: "Senna"});
   }
   function revoke() {
-    if (!initialized) return;
     window["ga-disable-" + id] = true;
-    command("consent", "update", {analytics_storage: "denied"});
+    if (initialized) command("consent", "update", {analytics_storage: "denied"});
     // Remove this site's GA cookies as well as preventing further collection.
     for (const cookie of document.cookie.split(";")) {
       const name = cookie.split("=")[0].trim();
@@ -50,16 +56,24 @@
       }
     }
   }
+  function status() {
+    setting.textContent = automatic ? (enabled ? "สถิติ: เปิด" : "สถิติ: ปิด")
+      : (enabled ? "สถิติ: อนุญาต" : "สถิติ: ไม่อนุญาต");
+    notice.hidden = !automatic;
+    notice.textContent = enabled
+      ? "เว็บนี้ใช้ Google Analytics และคุกกี้เก็บสถิติอัตโนมัติ ไม่ส่งแชทหรือรูป ปิดได้ที่ปุ่มสถิติ"
+      : "ปิดการเก็บสถิติ Google Analytics แล้ว ใช้งาน Senna ได้ตามปกติ";
+  }
   function choose(value) {
-    granted = value === "granted";
+    enabled = value === "granted" && !privacySignal();
     remember(value);
     banner.hidden = true;
-    setting.textContent = granted ? "สถิติ: อนุญาต" : "สถิติ: ไม่อนุญาต";
-    if (granted) init(); else revoke();
+    status();
+    if (enabled) init(true); else revoke();
   }
   window.SennaAnalytics = Object.freeze({
     track(event, details = {}) {
-      if (!id || !granted) return;
+      if (!id || !enabled || privacySignal()) return;
       const items = safeItems(details.items);
       let params;
       if (event === "advisor_start" && ["new", "owned"].includes(details.mode)) params = {mode: details.mode};
@@ -71,20 +85,36 @@
   });
   document.getElementById("analytics-accept").addEventListener("click", () => choose("granted"));
   document.getElementById("analytics-reject").addEventListener("click", () => choose("denied"));
-  setting.addEventListener("click", () => { banner.hidden = false; });
+  setting.addEventListener("click", () => { banner.hidden = !banner.hidden; });
   window.addEventListener("storage", event => {
     if (event.key === key && event.newValue !== "granted") {
-      granted = false;
+      enabled = false;
       revoke();
-      setting.textContent = "สถิติ: ไม่อนุญาต";
+      status();
     }
   });
   fetch("/advisor/api/integrations").then(r => r.ok ? r.json() : {}).then(config => {
     if (!/^G-[A-Z0-9]{6,20}$/.test(config.ga4_measurement_id || "")) return;
     id = config.ga4_measurement_id;
+    automatic = config.analytics_mode === "automatic_notice";
     setting.hidden = false;
+    if (automatic) {
+      document.getElementById("analytics-copy").textContent =
+        "Senna ใช้ Google Analytics และคุกกี้เพื่อวัดการเปิดเว็บ ดูคำแนะนำ เลือกขวด และกดไปร้านค้า Google ได้รับข้อมูลเบราว์เซอร์และอุปกรณ์ เราไม่ส่งข้อความแชท รูป หรือรหัสผู้เข้าร่วม ปิดสถิติได้โดยไม่กระทบการใช้งาน การปิดไม่ลบข้อมูลที่ส่งไปแล้ว";
+      document.getElementById("analytics-accept").textContent = "เปิดสถิติ";
+      document.getElementById("analytics-reject").textContent = "ปิดสถิติ";
+    }
     const previous = saved();
-    if (previous === "granted" || previous === "denied") choose(previous);
+    if (privacySignal()) {
+      enabled = false;
+      revoke();
+      status();
+    } else if (previous === "granted" || previous === "denied") choose(previous);
+    else if (automatic) {
+      enabled = true;
+      status();
+      init(false);
+    }
     else banner.hidden = false;
   }).catch(() => {});
 })();
